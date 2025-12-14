@@ -70,7 +70,7 @@ function Hero() {
     }
 
     return (
-        <div transition className="flex flex-col justify-center items-center min-h-screen overflow-x-hidden px-4 md:px-10 lg:px-20 pt-20 pb-10">
+        <div className="flex flex-col justify-center items-center min-h-screen overflow-x-hidden px-4 md:px-10 lg:px-20 pt-20 pb-10">
             <section className="flex flex-col items-center justify-center w-full">
                 <h1 className="bg-gradient-to-r from-[#FF7A00] via-[#FF3E1F] to-[#FF001F] bg-clip-text text-transparent text-4xl md:text-6xl lg:text-8xl font-extrabold mb-4 md:mb-6 text-center">
                     Your Resume Sucks.

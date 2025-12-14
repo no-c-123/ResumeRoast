@@ -6,6 +6,10 @@ html {
     scroll-behavior: smooth;
 }
 
+.page-transition {
+    view-transition-name: page-content;
+}
+
 @property --border-angle {
     inherits: false;
     initial-value: 0deg;
@@ -21,114 +25,27 @@ html {
     }
 }
 
-/* ========== DEFAULT TRANSITION (Fallback) ========== */
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation-duration: 0.5s;
+/* Simple fade transition for all pages */
+::view-transition-old(page-content),
+::view-transition-new(page-content) {
+  animation-duration: 0.3s;
   animation-timing-function: ease-in-out;
 }
 
-/* ========== LATERAL TRANSITIONS (Left/Right) ========== */
-
-/* Forward: Home → About → Pricing */
-html[data-direction="forward"] ::view-transition-old(root) {
-  animation: slide-out-left 0.5s ease-in-out;
+::view-transition-old(page-content) {
+  animation-name: fade-out;
 }
 
-html[data-direction="forward"] ::view-transition-new(root) {
-  animation: slide-in-right 0.5s ease-in-out;
+::view-transition-new(page-content) {
+  animation-name: fade-in;
 }
 
-/* Backward: Pricing → About → Home */
-html[data-direction="back"] ::view-transition-old(root) {
-  animation: slide-out-right 0.5s ease-in-out;
+@keyframes fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
 }
 
-html[data-direction="back"] ::view-transition-new(root) {
-  animation: slide-in-left 0.5s ease-in-out;
-}
-
-/* ========== VERTICAL TRANSITIONS (Login) ========== */
-
-/* To/From Login */
-html[data-direction="vertical"] ::view-transition-old(root) {
-  animation: push-down-out 0.5s ease-in-out;
-}
-
-html[data-direction="vertical"] ::view-transition-new(root) {
-  animation: push-down-in 0.5s ease-in-out;
-}
-
-/* ========== KEYFRAMES ========== */
-
-/* Slide Out Left (page exits to the left) */
-@keyframes slide-out-left {
-  0% {
-    transform: translateX(0);
-    opacity: 1;
-  }
-  100% {
-    transform: translateX(-100%);
-    opacity: 1;
-  }
-}
-
-/* Slide In Right (page enters from the right) */
-@keyframes slide-in-right {
-  0% {
-    transform: translateX(100%);
-    opacity: 1;
-  }
-  100% {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-/* Slide Out Right (page exits to the right) */
-@keyframes slide-out-right {
-  0% {
-    transform: translateX(0);
-    opacity: 1;
-  }
-  100% {
-    transform: translateX(100%);
-    opacity: 1;
-  }
-}
-
-/* Slide In Left (page enters from the left) */
-@keyframes slide-in-left {
-  0% {
-    transform: translateX(-100%);
-    opacity: 1;
-  }
-  100% {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-/* Push Down Out (old page pushed down) */
-@keyframes push-down-out {
-  0% {
-    transform: translateY(0);
-    opacity: 1;
-  }
-  100% {
-    transform: translateY(100%);
-    opacity: 1;
-  }
-}
-
-/* Push Down In (new page pushes from top) */
-@keyframes push-down-in {
-  0% {
-    transform: translateY(-100%);
-    opacity: 1;
-  }
-  100% {
-    transform: translateY(0);
-    opacity: 1;
-  }
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }

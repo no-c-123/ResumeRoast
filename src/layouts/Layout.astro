@@ -13,45 +13,9 @@ import Footer from '../components/Footer.astro';
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 		<meta name="generator" content={Astro.generator} />
 		<title>Resume Roast</title>
-		<script is:inline>
-			// Set default direction
-			document.documentElement.dataset.direction = 'default';
-			
-			const pageOrder = ['/', '/about', '/pricing'];
-
-			document.addEventListener('astro:before-preparation', (event) => {
-				const fromPath = event.from?.pathname || '/';
-				const toPath = event.to?.pathname || '/';
-				
-				console.log('From:', fromPath, 'To:', toPath);
-				
-				const currentIndex = pageOrder.indexOf(fromPath);
-				const nextIndex = pageOrder.indexOf(toPath);
-				
-				// Login transitions (vertical)
-				if (toPath === '/login' || fromPath === '/login') {
-					document.documentElement.dataset.direction = 'vertical';
-					console.log('Direction: vertical');
-				}
-				// Lateral transitions
-				else if (currentIndex !== -1 && nextIndex !== -1) {
-					if (currentIndex < nextIndex) {
-						document.documentElement.dataset.direction = 'forward';
-						console.log('Direction: forward');
-					} else {
-						document.documentElement.dataset.direction = 'back';
-						console.log('Direction: back');
-					}
-				}
-				else {
-					document.documentElement.dataset.direction = 'default';
-					console.log('Direction: default');
-				}
-			});
-		</script>
+		<ViewTransitions />
 	</head>
 	<body>
-		<ViewTransitions />
 		<NavBar />
 		<slot />
 		<Footer/>
