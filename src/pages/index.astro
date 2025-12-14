@@ -1,9 +1,10 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import Hero from '../components/Hero.jsx';
-
 ---
 
 <Layout>
-	<Hero/>
+	<div transition:animate="slide" transition:name="slide2">
+		<Hero client:load/>
+	</div>
 </Layout>

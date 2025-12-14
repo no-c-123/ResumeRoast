@@ -1,12 +1,13 @@
 ---
 import '../styles/global.css';
+import { ViewTransitions } from 'astro:transitions';
 import NavBar from '../components/NavBar.astro';
 import Footer from '../components/Footer.astro';
 ---
 
 <!doctype html>
 <html lang="en">
-	<head>
+	<head transition:name="slide" transition:animate="slide">
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width" />
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -14,10 +15,9 @@ import Footer from '../components/Footer.astro';
 		<title>Resume Roast</title>
 	</head>
 	<body>
+		<ViewTransitions />
 		<NavBar />
-		
 		<slot />
-
 		<Footer/>
 	</body>
 </html>

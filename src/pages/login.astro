@@ -4,5 +4,7 @@ import LoginForm from "../components/LoginForm.jsx"
 ---
 
 <Layout>
-    <LoginForm client:load/>
+    <div transition:name="up-down" transition:animate="slide">
+        <LoginForm client:load/>
+    </div>
 </Layout>
