@@ -2,49 +2,48 @@
 const currentPath = Astro.url.pathname;
 ---
 <!-- Navigation Bar -->
-<div class="w-full h-20 flex items-center justify-around px-8 sticky top-0 z-50 pt-2 bg-black/30 backdrop-blur-2xl border-b-[0.5px] border-white/10">
-    <nav class="flex items-center gap-4 top-0 left-0 w-full h-16">
-        <div class="flex items-center gap-4 absolute">
-            <div class="bg-[#FF6333FF] rounded h-[36px] w-[36px]">
+<div class="w-full h-16 md:h-20 flex items-center justify-between px-4 md:px-8 sticky top-0 z-50 pt-2 bg-black/30 backdrop-blur-2xl border-b-[0.5px] border-white/10">
+    <nav class="flex items-center justify-between w-full h-16">
+        <div class="flex items-center gap-2 md:gap-4">
+            <div class="bg-[#FF6333FF] rounded h-[32px] w-[32px] md:h-[36px] md:w-[36px]">
                 <img 
                     src="/image.png" 
                     alt="ResumeRoast-Logo"
-                    class="w-10 h-10 pb-1 rounded"
+                    class="w-8 h-8 md:w-10 md:h-10 pb-1 rounded"
                 >
             </div>
             <a 
                 href="/" 
-                class="text-[#FF6333FF] font-medium text-[23px]">
+                class="text-[#FF6333FF] font-medium text-lg md:text-[23px]">
                 Resume Roast
             </a>
-
-            <div class="text-white flex h-9 items-center gap-14 ml-auto font-medium text-[16px] pl-16">
-                <a 
-                    href="/" 
-                    class={currentPath === '/' ? 'text-[#ff835d]' : 'text-white hover:text-[#ff835d] duration-300'}
-                >
-                    Home
-                </a>
-                <a 
-                    href="/about" 
-                    class={currentPath === '/about' || currentPath === '/about/' ? 'text-[#ff835d]' : 'text-white hover:text-[#ff835d] duration-300'}
-                >
-                    About
-                </a>
-                <a 
-                    href="/pricing" 
-                    class={currentPath === '/pricing' || currentPath === '/pricing/' ? 'text-[#ff835d]' : 'text-white hover:text-[#ff835d] duration-300'}
-                >
-                    Pricing
-                </a>
-            </div>
-
         </div>
-        
-        <div class="flex absolute right-10 text-white gap-8 font-medium">
-            <button
-                onclick=""
+
+        <!-- Desktop Navigation -->
+        <div class="hidden md:flex text-white items-center gap-8 lg:gap-14 font-medium text-[16px]">
+            <a 
+                href="/" 
+                class={currentPath === '/' ? 'text-[#ff835d]' : 'text-white hover:text-[#ff835d] duration-300'}
             >
+                Home
+            </a>
+            <a 
+                href="/about" 
+                class={currentPath === '/about' || currentPath === '/about/' ? 'text-[#ff835d]' : 'text-white hover:text-[#ff835d] duration-300'}
+            >
+                About
+            </a>
+            <a 
+                href="/pricing" 
+                class={currentPath === '/pricing' || currentPath === '/pricing/' ? 'text-[#ff835d]' : 'text-white hover:text-[#ff835d] duration-300'}
+            >
+                Pricing
+            </a>
+        </div>
+
+        <!-- Desktop Login/Signup -->
+        <div class="hidden md:flex text-white gap-4 md:gap-8 font-medium">
+            <button>
                 <a href="/login">Login</a>
             </button>
             
@@ -54,6 +53,51 @@ const currentPath = Astro.url.pathname;
                 <a href="/login">Sign Up</a>
             </button>
         </div>
-        
+
+        <!-- Mobile Menu Button -->
+        <button id="mobile-menu-btn" class="md:hidden text-white">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+            </svg>
+        </button>
     </nav>
+
+    <!-- Mobile Menu -->
+    <div id="mobile-menu" class="hidden md:hidden absolute top-16 left-0 w-full bg-black/95 backdrop-blur-2xl border-b border-white/10 py-4">
+        <div class="flex flex-col gap-4 px-4">
+            <a 
+                href="/" 
+                class={`${currentPath === '/' ? 'text-[#ff835d]' : 'text-white'} text-base py-2`}
+            >
+                Home
+            </a>
+            <a 
+                href="/about" 
+                class={`${currentPath === '/about' || currentPath === '/about/' ? 'text-[#ff835d]' : 'text-white'} text-base py-2`}
+            >
+                About
+            </a>
+            <a 
+                href="/pricing" 
+                class={`${currentPath === '/pricing' || currentPath === '/pricing/' ? 'text-[#ff835d]' : 'text-white'} text-base py-2`}
+            >
+                Pricing
+            </a>
+            <div class="flex flex-col gap-2 pt-2 border-t border-white/10">
+                <a href="/login" class="text-white py-2">Login</a>
+                <button class="bg-gradient-to-r from-[#FF6333FF] to-[#DC2626FF] rounded-3xl w-full h-10 text-white">
+                    Sign Up
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
+
+<script>
+    const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+    const mobileMenu = document.getElementById('mobile-menu');
+    
+    mobileMenuBtn?.addEventListener('click', () => {
+        mobileMenu?.classList.toggle('hidden');
+    });
+</script>

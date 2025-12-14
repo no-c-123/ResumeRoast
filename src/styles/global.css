@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+html {
+    scroll-behavior: smooth;
+}
+
 @property --border-angle {
     inherits: false;
     initial-value: 0deg;
