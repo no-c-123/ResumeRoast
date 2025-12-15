@@ -25,7 +25,7 @@ export default function Pricing() {
 
     return (
         <>
-            <div className={`fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] md:w-2/3 h-[60vh] md:h-[60vh] transition-all ease-in-out duration-500 [background:linear-gradient(#0c0c0e,#0c0c0e)_padding-box,conic-gradient(from_var(--border-angle),theme(colors.orange.600)_80%,_theme(colors.orange.500)_86%,_theme(colors.orange.300)_90%,_theme(colors.orange.500)_94%,_theme(colors.orange.600))_border-box] rounded-3xl border-[3px] border-transparent [animation:border_4s_linear_infinite] z-50 ${showPaywallModal ? 'flex' : 'hidden'} justify-center items-center`}>
+            <div className={`fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] md:w-2/3 h-[60vh] md:h-[60vh] transition-all ease-in-out duration-500 [background:linear-gradient(#0c0c0e,#0c0c0e)_padding-box,conic-gradient(from_var(--border-angle),theme(colors.orange.600)_80%,_theme(colors.orange.500)_86%,_theme(colors.orange.300)_90%,_theme(colors.orange.500)_94%,_theme(colors.orange.600))_border-box] rounded-3xl border-[3px] border-transparent [animation:border_4s_linear_infinite] z-50 flex justify-center items-center ${showPaywallModal ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
                 <button 
                     onClick={() => setShowPaywallModal(false)}
                     className="absolute top-4 right-4 text-neutral-400 hover:text-white transition-colors"
