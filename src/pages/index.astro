@@ -3,8 +3,8 @@ import Layout from '../layouts/Layout.astro';
 import Hero from '../components/Hero.jsx';
 ---
 
-<Layout>
-	<div class="page-transition">
+<div transition:animate="slide" transition:name="slide-up">
+	<Layout>
 		<Hero client:load/>
-	</div>
-</Layout>
+	</Layout>
+</div>

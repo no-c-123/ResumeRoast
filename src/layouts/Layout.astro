@@ -13,13 +13,18 @@ import Footer from '../components/Footer.astro';
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 		<meta name="generator" content={Astro.generator} />
 		<title>Resume Roast</title>
-		<ViewTransitions />
 	</head>
 	<body>
-		<NavBar />
-		<slot />
-		<Footer/>
+		<div style="view-transition-name: navbar;">
+			<NavBar />
+		</div>
+		<ViewTransitions />
+			<slot/>
+		<div style="view-transition-name: footer;">
+			<Footer />
+		</div>
 	</body>
+	
 </html>
 
 <style>

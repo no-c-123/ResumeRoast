@@ -25,27 +25,42 @@ html {
     }
 }
 
-/* Simple fade transition for all pages */
-::view-transition-old(page-content),
-::view-transition-new(page-content) {
-  animation-duration: 0.3s;
-  animation-timing-function: ease-in-out;
+@keyframes slide-up {
+    0% {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+    100% {
+        transform: translateY(0);
+        opacity: 1;
+    }
 }
 
-::view-transition-old(page-content) {
-  animation-name: fade-out;
+@keyframes slide-out {
+    0% {
+        animation: all 0.5s ease;
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(0);
+        opacity: 0;
+    }
 }
 
-::view-transition-new(page-content) {
-  animation-name: fade-in;
+/* Disable animations for navbar and footer */
+::view-transition-old(navbar),
+::view-transition-new(navbar),
+::view-transition-old(footer),
+::view-transition-new(footer) {
+  animation: none !important;
 }
 
-@keyframes fade-out {
-  from { opacity: 1; }
-  to { opacity: 0; }
+::view-transition-old(*){
+  animation: slide-out 0.5s ease forwards;
+  opacity:0;
 }
 
-@keyframes fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+::view-transition-new(*){
+  animation: slide-up 0.5s ease forwards;
+  opacity:1;
 }

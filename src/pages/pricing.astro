@@ -4,7 +4,7 @@ import PricingComponent from "../components/Pricing.jsx"
 ---
 
 <Layout>
-    <div class="page-transition">
+    <div transition:name="slide-up" transition:animate="slide">
         <PricingComponent client:load/>
     </div>
 </Layout>
