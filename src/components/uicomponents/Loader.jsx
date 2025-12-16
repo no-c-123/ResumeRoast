@@ -91,9 +91,9 @@ const Loader = () => {
           animation: loading2_713 3.5s ease both infinite;
         }
       `}</style>
-      <div className='w-full h-full absolute flex justify-center items-center mb-4'>
-        <div className="w-20 h-[50px] absolute">
-            <span className="loader-text absolute top-0 p-0 m-0 text-orange-300 text-xs tracking-wide">
+      <div className='flex justify-center items-center'>
+        <div className="w-20 h-[50px] relative">
+            <span className="loader-text absolute inset-0 p-0 m-0 text-orange-300 text-xs tracking-wide">
             loading
             </span>
             <span className="load bg-orange-500 rounded-[50px] block h-4 w-4 bottom-0 absolute translate-x-16" />

@@ -1,7 +1,7 @@
 ---
 import '../styles/global.css';
 import { ViewTransitions } from 'astro:transitions';
-import NavBar from '../components/NavBar.astro';
+import NavBar from '../components/NavBar.jsx';
 import Footer from '../components/Footer.astro';
 ---
 
@@ -16,7 +16,7 @@ import Footer from '../components/Footer.astro';
 	</head>
 	<body>
 		<div style="view-transition-name: navbar;">
-			<NavBar />
+			<NavBar client:load/>
 		</div>
 		<ViewTransitions />
 			<slot/>

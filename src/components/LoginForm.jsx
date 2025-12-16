@@ -1,19 +1,108 @@
 import React, {useState} from 'react';
+import { supabase } from '../lib/supabaseClient';
+import { set } from 'astro:schema';
+import { occupations } from '../data/occupations';
 
 function LoginForm() {
     const [isSignUp, setIsSignUp] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [showSignupPassword, setShowSignupPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+
+
+    // Login setup
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [errorMessage, setErrorMessage] = useState('');
+    
+    // Sign Up setup
+    const [name, setName] = useState('');
+    const [lastname, setLastName] = useState('');
+    const [userId, setUserId] = useState(null);
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [ occupation, setOccupation ] = useState('');
+
+    const [isLoggedIn, setIsLoggedIn] = useState(false);
     
     const toggleForm = () => {
         setIsSignUp(!isSignUp);
     }
     
+    const handleLogin = async (e) => {
+        e.preventDefault();
+        setErrorMessage('');
+
+        const { data, error } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+        })
+
+        if (error) {
+            setErrorMessage(error.message);
+            setIsLoading(false);
+            return;
+        }
+
+        if (data.user) {
+            window.location.href = '/';
+        } else {
+            window.location.href = '/verify-email';
+        }
+        
+    }
+
+    const handleSignUp = async (e) => {
+        e.preventDefault();
+        setErrorMessage('');
+        setIsLoading(true);
+
+        if (password !== confirmPassword) {
+            setErrorMessage('Passwords do not match.');
+            setIsLoading(false);
+            return;
+        }
+
+        const { data, error } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+                data: { name: name.trim(), lastname: lastname.trim(), occupation: occupation.trim() },
+            },
+        });
+
+        if (error) {
+            setErrorMessage(error.message);
+            setIsLoading(false);
+            return;
+        }
+
+        if (data.user) {
+            // Optional: Save to profiles table if needed
+            const { error: profileError } = await supabase.from('profiles').insert({
+                user_id: data.user.id,
+                two_factor_enabled: false,
+                two_factor_secret: null,
+            });
+
+            if (profileError) {
+                console.error('Profile creation error:', profileError.message);
+                // Don't block signup if profile creation fails
+            }
+
+            // Redirect to verification or home page
+            window.location.href = '/verify-email';
+        } else {
+            setErrorMessage('User ID not found after sign up.');
+            setIsLoading(false);
+        }
+
+    }
+
     return (
 
         <div className='min-h-screen flex items-center justify-center p-4'>
-            <div className='relative w-full max-w-6xl h-auto md:h-[600px] rounded-3xl shadow-2xl overflow-hidden'>
+            <div className={`relative w-full max-w-6xl rounded-3xl shadow-2xl overflow-hidden transition-all duration-300 ${isSignUp ? 'md:h-[800px]' : 'h-[500px] md:h-[600px]'}`}>
                 
                 {/* Sliding Overlay */}
                 <div
@@ -70,9 +159,10 @@ function LoginForm() {
                                         </label>
                                         <input 
                                             type="email"
-                                            id="usernameOrEmail"
-                                            name="usernameOrEmail"
-                                            autoComplete="off"
+                                            placeholder='E-mail'
+                                            value={email}
+                                            label="Email"
+                                            onChange={(e) => setEmail(e.target.value)}
                                             required
                                             className="w-72 h-11 bg-white/5 rounded-lg px-4 border-2 border-transparent text-base text-[#FF6333FF] transition-[border-color,color,background] duration-300 ease-[cubic-bezier(.25,.01,.25,1)] hover:outline-none hover:border-[#ff3c00] focus:outline-none focus:border-[#ff3c00] group-hover:border-[#FF6333FF]"
                                         />
@@ -86,10 +176,9 @@ function LoginForm() {
                                         <div className="relative">
                                             <input 
                                                 type={showPassword ? 'text' : 'password'}
-                                                id="loginPassword"
-                                                name="password"
-                                                placeholder="password"
-                                                autoComplete="current-password"
+                                                placeholder='Password'
+                                                value={password}
+                                                onChange={(e) => setPassword(e.target.value)}
                                                 required
                                                 className="w-72 h-11 bg-white/5 rounded-lg px-4 pr-12 border-2 border-transparent text-base text-[#FF6333FF] transition-[border-color,color,background] duration-300 hover:border-[#ff3c00] focus:outline-none focus:border-[#ff3c00] focus:ring-2 focus:ring-orange-500/50"
                                             />
@@ -111,7 +200,14 @@ function LoginForm() {
                                             </button>
                                         </div>
                                     </div>
-                                    <button type="submit" className="w-72 max-w-sm h-11 bg-gradient-to-r from-[#FF6333FF] to-[#DC2626FF] rounded-lg text-white font-semibold hover:opacity-90 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:ring-offset-black">Sign In</button>
+                                    <button 
+                                        type="submit" 
+                                        className="w-72 max-w-sm h-11 bg-gradient-to-r from-[#FF6333FF] to-[#DC2626FF] rounded-lg text-white font-semibold hover:opacity-90 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:ring-offset-black"
+                                        onClick={handleLogin}
+                                    >
+                                        Sign In
+                                    </button>
+                                        {errorMessage && <p className="text-red-500 text-sm">{errorMessage}</p>}
                                 </form>
                                 <p className="text-neutral-300 text-sm">Don't remember your password? <span><a href="#" className="underline text-orange-500 hover:text-orange-400 cursor-pointer transition-colors">Reset it Here</a></span></p>
                             </section>
@@ -125,15 +221,65 @@ function LoginForm() {
                                 <form className="w-full h-full flex flex-col items-center gap-4 md:gap-6 p-4 md:p-8" action="">
                                     
                                     <div className="group w-full max-w-sm">
+                                        <label htmlFor="usernameOrEmail" className="block mb-1 text-sm font-bold text-[#FF6333FF] transition-colors duration-300 ease-[cubic-bezier(.25,.01,.25,1)] group-hover:text-[#ff3c00]">
+                                            Name
+                                        </label>
+                                        <input 
+                                            type="text"
+                                            placeholder='First Name'
+                                            value={name}
+                                            label="Name"
+                                            onChange={(e) => setName(e.target.value)}
+                                            required
+                                            className="w-full h-11 bg-white/5 rounded-lg px-4 border-2 border-transparent text-base text-[#FF6333FF] transition-all duration-300 hover:border-[#ff3c00] focus:outline-none focus:border-[#ff3c00] focus:ring-2 focus:ring-orange-500/50"
+                                        />
+                                        <div></div>
+                                    </div>
+
+                                    <div className="group w-full max-w-sm">
+                                        <label htmlFor="usernameOrEmail" className="block mb-1 text-sm font-bold text-[#FF6333FF] transition-colors duration-300 ease-[cubic-bezier(.25,.01,.25,1)] group-hover:text-[#ff3c00]">
+                                            Last Name
+                                        </label>
+                                        <input 
+                                            type="text"
+                                            placeholder='Last Name'
+                                            value={lastname}
+                                            label="Last Name"
+                                            onChange={(e) => setLastName(e.target.value)}
+                                            required
+                                            className="w-full h-11 bg-white/5 rounded-lg px-4 border-2 border-transparent text-base text-[#FF6333FF] transition-all duration-300 hover:border-[#ff3c00] focus:outline-none focus:border-[#ff3c00] focus:ring-2 focus:ring-orange-500/50"
+                                        />
+                                        <div></div>
+                                    </div>
+
+                                    <div className="group w-full max-w-sm">
+                                        <label htmlFor="signupEmail" className="block mb-1 text-sm font-semibold text-[#FF6333FF] transition-colors duration-300 group-hover:text-[#ff3c00]">
+                                            Occupation
+                                        </label>
+                                        <input 
+                                            type="text"
+                                            value={occupation}
+                                            list="occupations"
+                                            onChange={(e) => setOccupation(e.target.value)}
+                                            placeholder='Occupation'
+                                            className="w-full h-11 bg-white/5 rounded-lg px-4 border-2 border-transparent text-base text-[#FF6333FF] transition-all duration-300 hover:border-[#ff3c00] focus:outline-none focus:border-[#ff3c00] focus:ring-2 focus:ring-orange-500/50"
+                                        />
+                                        <datalist id="occupations">
+                                            {occupations.map((occupation) => (
+                                                <option key={occupation} value={occupation} />
+                                            ))}
+                                        </datalist>
+                                    </div>
+
+                                    <div className="group w-full max-w-sm">
                                         <label htmlFor="signupEmail" className="block mb-1 text-sm font-semibold text-[#FF6333FF] transition-colors duration-300 group-hover:text-[#ff3c00]">
                                             Username or Email
                                         </label>
                                         <input 
                                             type="email"
-                                            id="signupEmail"
-                                            name="usernameOrEmail"
-                                            autoComplete="email"
-                                            required
+                                            value={email}
+                                            onChange={(e) => setEmail(e.target.value)}
+                                            placeholder='Email'
                                             className="w-full h-11 bg-white/5 rounded-lg px-4 border-2 border-transparent text-base text-[#FF6333FF] transition-all duration-300 hover:border-[#ff3c00] focus:outline-none focus:border-[#ff3c00] focus:ring-2 focus:ring-orange-500/50"
                                         />
                                     </div>
@@ -145,10 +291,9 @@ function LoginForm() {
                                         <div className="relative">
                                             <input 
                                                 type={showSignupPassword ? 'text' : 'password'}
-                                                id="signupPassword"
-                                                name="password"
-                                                autoComplete="new-password"
-                                                required
+                                                value={password}
+                                                onChange={(e) => setPassword(e.target.value)}
+                                                placeholder='Password'
                                                 className="w-full h-11 bg-white/5 rounded-lg px-4 pr-12 border-2 border-transparent text-base text-[#FF6333FF] transition-all duration-300 hover:border-[#ff3c00] focus:outline-none focus:border-[#ff3c00] focus:ring-2 focus:ring-orange-500/50"
                                             />
                                             <button
@@ -177,10 +322,9 @@ function LoginForm() {
                                         <div className="relative">
                                             <input 
                                                 type={showConfirmPassword ? 'text' : 'password'}
-                                                id="confirmPassword"
-                                                name="confirmPassword"
-                                                autoComplete="new-password"
-                                                required
+                                                value={confirmPassword}
+                                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                                placeholder='Confirm Password'
                                                 className="w-full h-11 bg-white/5 rounded-lg px-4 pr-12 border-2 border-transparent text-base text-[#FF6333FF] transition-all duration-300 hover:border-[#ff3c00] focus:outline-none focus:border-[#ff3c00] focus:ring-2 focus:ring-orange-500/50"
                                             />
                                             <button
@@ -202,7 +346,13 @@ function LoginForm() {
                                         </div>
                                     </div>
                                     
-                                    <button type="submit" className="w-full max-w-sm h-11 bg-gradient-to-r from-[#FF6333FF] to-[#DC2626FF] rounded-lg text-white font-semibold hover:opacity-90 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:ring-offset-black">Create Account</button>
+                                    <button 
+                                        type="submit" 
+                                        onClick={handleSignUp}
+                                        className="w-full max-w-sm h-11 bg-gradient-to-r from-[#FF6333FF] to-[#DC2626FF] rounded-lg text-white font-semibold hover:opacity-90 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:ring-offset-black"
+                                    >
+                                        Create Account
+                                    </button>
                                 </form>
                             </section>        
                         </div>
