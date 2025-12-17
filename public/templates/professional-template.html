@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{name}} - Resume</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 850px;
+            margin: 0 auto;
+            padding: 40px 60px;
+            background: white;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #333;
+        }
+        
+        .header h1 {
+            font-size: 32px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+        }
+        
+        .contact-info {
+            font-size: 13px;
+            color: #555;
+        }
+        
+        .summary {
+            margin: 30px 0;
+            text-align: center;
+            font-size: 14px;
+            line-height: 1.8;
+            padding: 0 20px;
+        }
+        
+        .section {
+            margin: 30px 0;
+        }
+        
+        .section-title {
+            font-size: 18px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #333;
+            margin-bottom: 20px;
+        }
+        
+        .job, .education-item {
+            margin-bottom: 25px;
+        }
+        
+        .job-header, .education-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        
+        .company, .school {
+            font-size: 14px;
+            color: #555;
+        }
+        
+        .date {
+            font-size: 14px;
+            color: #555;
+            font-style: italic;
+        }
+        
+        .job-title, .degree {
+            font-weight: 700;
+            font-size: 15px;
+            margin-bottom: 10px;
+        }
+        
+        .job ul, .education-item ul {
+            margin-left: 20px;
+            margin-top: 8px;
+        }
+        
+        .job li, .education-item li {
+            font-size: 14px;
+            margin-bottom: 8px;
+            line-height: 1.6;
+        }
+        
+        .tip {
+            color: #e74c3c;
+            font-weight: 600;
+        }
+        
+        .skills-section {
+            font-size: 14px;
+            line-height: 1.8;
+        }
+        
+        .skills-section p {
+            margin-bottom: 10px;
+        }
+        
+        .skills-label {
+            font-weight: 700;
+            display: inline;
+        }
+        
+        @media print {
+            body {
+                padding: 20px 40px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>{{name}}</h1>
+        <div class="contact-info">
+            {{location}} • {{phone}} • {{email}} • {{linkedin}}
+        </div>
+    </div>
+    
+    <div class="summary">
+        {{summary}}
+    </div>
+    
+    <div class="section">
+        <h2 class="section-title">Professional Experience</h2>
+        {{#each experience}}
+        <div class="job">
+            <div class="job-header">
+                <div class="company">{{company}}, {{location}}</div>
+                <div class="date">{{dates}}</div>
+            </div>
+            <div class="job-title">{{title}}</div>
+            <ul>
+                {{#each achievements}}
+                <li>{{this}}</li>
+                {{/each}}
+            </ul>
+        </div>
+        {{/each}}
+    </div>
+    
+    <div class="section">
+        <h2 class="section-title">Education</h2>
+        {{#each education}}
+        <div class="education-item">
+            <div class="education-header">
+                <div class="school">{{school}}, {{location}}</div>
+                <div class="date">{{year}}</div>
+            </div>
+            <div class="degree">{{degree}}</div>
+            {{#if awards}}
+            <ul>
+                {{#each awards}}
+                <li>{{this}}</li>
+                {{/each}}
+            </ul>
+            {{/if}}
+        </div>
+        {{/each}}
+    </div>
+    
+    <div class="section">
+        <h2 class="section-title">Skills & Other</h2>
+        <div class="skills-section">
+            {{#if skills}}
+            <p><span class="skills-label">Skills:</span> {{skills}}</p>
+            {{/if}}
+            {{#if volunteering}}
+            <p><span class="skills-label">Volunteering:</span> {{volunteering}}</p>
+            {{/if}}
+        </div>
+    </div>
+</body>
+</html>

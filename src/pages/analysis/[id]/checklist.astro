@@ -1,0 +1,12 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import ChecklistDetailsPage from '../../../components/ChecklistDetailsPage.jsx';
+
+export const prerender = false;
+
+const { id } = Astro.params;
+---
+
+<Layout title="Detailed Checklist - Resume Roast">
+    <ChecklistDetailsPage client:load analysisId={id} />
+</Layout>

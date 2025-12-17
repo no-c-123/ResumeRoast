@@ -1,0 +1,12 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import AnalysisResultsPage from '../../components/AnalysisResultsPage.jsx';
+
+export const prerender = false;
+
+const { id } = Astro.params;
+---
+
+<Layout title="Resume Analysis Results - Resume Roast">
+    <AnalysisResultsPage client:load analysisId={id} />
+</Layout>

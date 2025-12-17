@@ -1,0 +1,10 @@
+---
+import Layout from '../layouts/Layout.astro';
+import AnalyzingPage from '../components/AnalyzingPage.jsx';
+
+export const prerender = false;
+---
+
+<Layout title="Analyzing Your Resume - Resume Roast">
+    <AnalyzingPage client:load />
+</Layout>

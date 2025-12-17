@@ -124,47 +124,47 @@ export default function Pricing() {
                         <button className="w-full max-w-96 mx-4 h-11 text-white font-bold text-lg bg-orange-500 rounded-2xl mt-11 hover:bg-orange-500/90" onClick={() => setShowPaywallModal(true)}> Get Started </button>
                     </div>
 
-                    {/* Enterprise Plan */}
+                    {/* One-Time Payment Plan */}
                     <div className="flex flex-col items-center w-full max-w-[432px] h-auto lg:h-[550px] lg:[transform:rotateY(-15deg)] lg:hover:[transform:rotateY(0deg)] hover:scale-105 transition-all duration-300 shadow-neutral-800 shadow-2xl [background:linear-gradient(#0c0c0e,#0c0c0e)_padding-box,conic-gradient(from_var(--border-angle),theme(colors.orange.600)_80%,_theme(colors.orange.500)_86%,_theme(colors.orange.300)_90%,_theme(colors.orange.500)_94%,_theme(colors.orange.600))_border-box] rounded-3xl border-[3px] border-transparent [animation:border_4s_linear_infinite]">
-                        <h1 className="text-4xl font-bold text-white pt-10">Enterprise</h1>
-                        <h1 className="text-4xl font-bold text-white p-6">$100<span className="text-base text-orange-400">/mo</span></h1>
-                        <p className="text-lg font-bold text-neutral-400 px-8 text-center">For teams & organizations at scale.</p>
+                        <h1 className="text-4xl font-bold text-white pt-10">Lifetime</h1>
+                        <h1 className="text-4xl font-bold text-white p-6">$149<span className="text-base text-orange-400"> once</span></h1>
+                        <p className="text-lg font-bold text-neutral-400 px-8 text-center">Pay once, own it forever.</p>
                         <li className="flex justify-center items-start flex-col p-4">
                             <div className="flex h-10 gap-4 pt-4">
                                 <svg className="w-6 h-6 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
                                 </svg>
-                                <p className="text-neutral-400">Everything in Pro</p>
+                                <p className="text-neutral-300 font-normal">Detailed AI fixes & suggestions</p>
                             </div>
                             <div className="flex h-10 gap-4 pt-4">
                                 <svg className="w-6 h-6 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
                                 </svg>
-                                <p className="text-neutral-400">Multi-user team accounts</p>
+                                <p className="text-neutral-400">Unlimited roast report access</p>
                             </div>
                             <div className="flex h-10 gap-4 pt-4">
                                 <svg className="w-6 h-6 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
                                 </svg>
-                                <p className="text-neutral-400">Dedicated account manager</p>
+                                <p className="text-neutral-400">Unlimited advanced feedback downloads</p>
                             </div>
                             <div className="flex h-10 gap-4 pt-4">
                                 <svg className="w-6 h-6 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
                                 </svg>
-                                <p className="text-neutral-400">Custom branding options</p>
+                                <p className="text-neutral-400">Advanced keyword optimization</p>
                             </div>
                             <div className="flex h-10 gap-4 pt-4">
                                 <svg className="w-6 h-6 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
                                 </svg>
-                                <p className="text-neutral-400">API access for integrations</p>
+                                <p className="text-neutral-400">Priority ATS compatibility check</p>
                             </div>
                             <div className="flex h-10 gap-4 pt-4">
                                 <svg className="w-6 h-6 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
                                 </svg>
-                                <p className="text-neutral-400">24/7 premium support</p>
+                                <p className="text-neutral-400">Priority customer support</p>
                             </div>
                         </li>
                         <button className="w-full max-w-96 mx-4 h-11 text-white font-bold text-lg bg-orange-500 rounded-2xl mt-2 hover:bg-orange-500/90" onClick={() => setShowPaywallModal(true)}> Get Started </button>
@@ -181,7 +181,7 @@ export default function Pricing() {
                             <div className="text-neutral-400 font-semibold text-sm md:text-lg">Feature</div>
                             <div className="text-white font-semibold text-sm md:text-lg text-center">Free</div>
                             <div className="text-white font-semibold text-sm md:text-lg text-center">Pro</div>
-                            <div className="text-white font-semibold text-sm md:text-lg text-center">Enterprise</div>
+                            <div className="text-white font-semibold text-sm md:text-lg text-center">Lifetime</div>
                         </div>
 
                         {/* AI Resume Roast */}

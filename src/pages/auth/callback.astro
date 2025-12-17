@@ -1,0 +1,76 @@
+---
+// Auth callback page for OAuth providers
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Authenticating...</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, #000 0%, #1a1a1a 100%);
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+        .loader {
+            text-align: center;
+            color: #fff;
+        }
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(255, 99, 51, 0.1);
+            border-top-color: #FF6333;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="loader">
+        <div class="spinner"></div>
+        <h2>Authenticating...</h2>
+        <p>Please wait while we sign you in</p>
+    </div>
+
+    <script>
+        // Handle the OAuth callback
+        window.addEventListener('load', async () => {
+            try {
+                // The URL will have hash params with the session info
+                const hashParams = new URLSearchParams(window.location.hash.substring(1));
+                
+                // Check if we have an access token (successful auth)
+                if (hashParams.get('access_token')) {
+                    // Redirect to home page - Supabase will handle the session
+                    window.location.href = '/';
+                } else if (hashParams.get('error')) {
+                    // Handle error
+                    console.error('Auth error:', hashParams.get('error_description'));
+                    window.location.href = '/login?error=' + encodeURIComponent(hashParams.get('error_description') || 'Authentication failed');
+                } else {
+                    // No hash params, might be coming back from provider
+                    // Wait a moment then redirect
+                    setTimeout(() => {
+                        window.location.href = '/';
+                    }, 1000);
+                }
+            } catch (error) {
+                console.error('Callback error:', error);
+                window.location.href = '/login';
+            }
+        });
+    </script>
+</body>
+</html>
