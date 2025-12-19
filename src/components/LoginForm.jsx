@@ -1,9 +1,19 @@
-import React, {useState} from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { set } from 'astro:schema';
 import { occupations } from '../data/occupations';
 
 function LoginForm() {
+        // Redirect if already logged in (prevents OAuth login loop)
+        useEffect(() => {
+            const checkSession = async () => {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session && session.user) {
+                    window.location.href = '/dashboard';
+                }
+            };
+            checkSession();
+        }, []);
     const [isSignUp, setIsSignUp] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [showSignupPassword, setShowSignupPassword] = useState(false);
@@ -45,7 +55,18 @@ function LoginForm() {
         }
 
         if (data.user) {
-            window.location.href = '/';
+            // Check if user has a profile to determine if it's their first time
+            const { data: profile } = await supabase
+                .from('user_profiles')
+                .select('id')
+                .eq('user_id', data.user.id)
+                .single();
+
+            if (profile) {
+                window.location.href = '/';
+            } else {
+                window.location.href = '/resume-builder?new=true';
+            }
         } else {
             window.location.href = '/verify-email';
         }
@@ -85,6 +106,7 @@ function LoginForm() {
             password,
             options: {
                 data: { name: name.trim(), lastname: lastname.trim(), occupation: occupation.trim() },
+                emailRedirectTo: `${window.location.origin}/resume-builder`
             },
         });
 
@@ -95,20 +117,21 @@ function LoginForm() {
         }
 
         if (data.user) {
-            // Optional: Save to profiles table if needed
-            const { error: profileError } = await supabase.from('profiles').insert({
+            const { error: profileError } = await supabase.from('user_profiles').insert({
                 user_id: data.user.id,
-                two_factor_enabled: false,
-                two_factor_secret: null,
+                full_name: `${name.trim()} ${lastname.trim()}`,
+                email: email,
             });
 
             if (profileError) {
                 console.error('Profile creation error:', profileError.message);
-                // Don't block signup if profile creation fails
             }
 
-            // Redirect to verification or home page
-            window.location.href = '/verify-email';
+            if (data.session) {
+                window.location.href = '/resume-builder?new=true';
+            } else {
+                window.location.href = '/verify-email';
+            }
         } else {
             setErrorMessage('User ID not found after sign up.');
             setIsLoading(false);

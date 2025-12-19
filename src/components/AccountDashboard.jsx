@@ -514,40 +514,15 @@ function AccountDashborad() {
                             ) : (
                                 <div className="animate-fade-in">
                                     <h2 className='text-2xl font-bold mb-6'>My Resume</h2>
-                                    <div 
-                                        className={`relative bg-gradient-to-r from-neutral-800/20 to-neutral-200/10 border-dashed border-2 border-neutral-500/50 rounded-xl p-8 flex flex-col items-center justify-center text-center transition-all duration-300 cursor-pointer group
-                                            ${isDragging 
-                                                ? 'border-orange-500/80 bg-neutral-800/80' 
-                                                : 'border-neutral-500/20 hover:border-orange-500/50'
-                                            }`}
-                                        onClick={openFilePicker}
-                                        onDragOver={onDragOver}
-                                        onDragLeave={onDragLeave}
-                                        onDrop={onDrop}
-                                    >
-                                        {isLoading && (
-                                            <div className="absolute inset-0 bg-black/70 flex items-center justify-center rounded-xl z-10">
-                                                <Loader />
+                                    {recentAnalyses.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center mt-12">
+                                            <p className="text-lg text-neutral-300 mb-6">You haven't uploaded a resume yet.</p>
+                                            <div className="flex gap-4">
+                                                <a href="/resume-builder" className="px-6 py-3 bg-gradient-to-r from-orange-500 to-red-500 rounded-lg text-white font-semibold hover:opacity-90 transition">Create a Resume</a>
+                                                <a href="/" className="px-6 py-3 bg-neutral-800 rounded-lg text-white font-semibold hover:bg-neutral-700 transition">Analyze your Resume</a>
                                             </div>
-                                        )}
-                                        <div className="w-16 h-16 bg-neutral-700/50 rounded-full flex items-center justify-center mb-4 group-hover:bg-orange-500/20 transition-colors">
-                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8 text-neutral-400 group-hover:text-orange-500 transition-colors">
-                                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-                                            </svg>
                                         </div>
-                                        <h3 className="text-lg font-semibold text-white mb-2">Upload your resume</h3>
-                                        <p className="text-neutral-400 text-sm max-w-xs">Drag and drop your PDF here, or click to browse files</p>
-                                        <input
-                                            ref={fileInputRef}
-                                            type="file"
-                                            className="hidden"
-                                            accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                                            onChange={onInputChange}
-                                        />
-                                        {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
-                                    </div>
-                                    
-                                    {recentAnalyses.length > 0 && (
+                                    ) : (
                                         <div className="mt-8">
                                             <h3 className="text-lg font-semibold mb-4">Recent Analysis</h3>
                                             <div 

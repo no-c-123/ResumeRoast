@@ -1,9 +1,5 @@
-// pdf-parse library with different API
-import { createRequire } from 'module';
+// File parser for resume uploads
 import mammoth from 'mammoth';
-
-const require = createRequire(import.meta.url);
-const { PDFParse } = require('pdf-parse');
 
 /**
  * Extract text content from uploaded resume files
@@ -12,6 +8,8 @@ const { PDFParse } = require('pdf-parse');
  */
 export async function extractTextFromFile(file) {
   const fileType = file.type;
+  
+  console.log('Extracting text from file type:', fileType);
   
   try {
     if (fileType === 'application/pdf') {
@@ -22,28 +20,65 @@ export async function extractTextFromFile(file) {
     ) {
       return await extractFromWord(file);
     } else {
-      throw new Error('Unsupported file type');
+      throw new Error('Unsupported file type: ' + fileType);
     }
   } catch (error) {
     console.error('Error extracting text from file:', error);
-    throw new Error('Failed to parse resume file');
+    throw error;
   }
 }
 
 /**
- * Extract text from PDF file
+ * Extract text from PDF file using pdfreader
  * @param {File} file - PDF file
  * @returns {Promise<string>} - Extracted text
  */
 async function extractFromPDF(file) {
-  const arrayBuffer = await file.arrayBuffer();
-  const buffer = Buffer.from(arrayBuffer);
+  console.log('Starting PDF extraction for file:', file.name, 'size:', file.size);
   
-  // Create PDFParse instance with buffer data
-  const parser = new PDFParse({ data: buffer });
-  const result = await parser.getText();
-  
-  return result.text;
+  try {
+    const { PdfReader } = await import('pdfreader');
+    
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    
+    console.log('Got buffer, length:', buffer.length);
+    
+    return new Promise((resolve, reject) => {
+      const reader = new PdfReader();
+      let fullText = '';
+      let currentPage = 0;
+      
+      reader.parseBuffer(buffer, (err, item) => {
+        if (err) {
+          console.error('PDF parse error:', err);
+          reject(new Error('PDF parsing failed: ' + err.message));
+        } else if (!item) {
+          // End of file
+          console.log('PDF parsing complete. Total text length:', fullText.length);
+          console.log('First 500 chars:', fullText.substring(0, 500));
+          
+          if (!fullText || fullText.trim().length < 50) {
+            reject(new Error('Could not extract enough text from PDF. The PDF might contain only images or be password protected.'));
+          } else {
+            resolve(fullText.trim());
+          }
+        } else if (item.page) {
+          // New page
+          currentPage = item.page;
+          fullText += '\n';
+          console.log('Processing page', currentPage);
+        } else if (item.text) {
+          // Text item
+          fullText += item.text + ' ';
+        }
+      });
+    });
+  } catch (error) {
+    console.error('PDF extraction error:', error);
+    console.error('Error stack:', error.stack);
+    throw new Error('PDF parsing failed: ' + error.message);
+  }
 }
 
 /**

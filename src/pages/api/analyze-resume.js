@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
 import { extractTextFromFile } from '../../lib/fileParser.js';
+import { parseResumeTextToStructuredData } from '../../lib/resumeParser.js';
 
 export const prerender = false;
 
@@ -53,21 +54,29 @@ export async function POST({ request }) {
     // Extract text from resume
     let resumeText;
     try {
+      console.log('Starting text extraction for file:', file.name, 'type:', file.type, 'size:', file.size);
       resumeText = await extractTextFromFile(file);
       console.log('Extracted text length:', resumeText?.length);
+      console.log('First 300 characters:', resumeText?.substring(0, 300));
     } catch (extractError) {
       console.error('Error extracting text:', extractError);
+      console.error('Error stack:', extractError.stack);
       return new Response(JSON.stringify({ 
         error: 'Failed to parse resume file', 
-        details: extractError.message 
+        details: extractError.message,
+        errorType: extractError.name,
+        stack: extractError.stack
       }), {
         status: 500,
         headers: { 'Content-Type': 'application/json' }
       });
     }
 
-    if (!resumeText || resumeText.trim().length < 100) {
-      return new Response(JSON.stringify({ error: 'Could not extract enough text from resume' }), {
+    if (!resumeText || resumeText.trim().length < 50) {
+      return new Response(JSON.stringify({ 
+        error: 'Could not extract enough text from resume',
+        debug: `Extracted ${resumeText?.length || 0} characters`
+      }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' }
       });
@@ -85,8 +94,10 @@ export async function POST({ request }) {
 - Focus on potential, eagerness to learn, and transferable skills from non-professional contexts
 - Be ENCOURAGING about academic achievements, relevant coursework, and personal initiatives
 - A 1-page resume is EXPECTED and APPROPRIATE
-- Do NOT penalize for lack of professional accomplishments - focus on what they HAVE done
-- Evaluate based on: relevant coursework, academic projects, soft skills development, and demonstrated initiative`
+- Do NOT penalize heavily for lack of professional accomplishments - focus on what they HAVE done
+- Evaluate based on: relevant coursework, academic projects, soft skills development, and demonstrated initiative
+- **SCORING:** Baseline score should be 50-70 for a decent intern resume. Score based on potential, not extensive experience.
+- **FEEDBACK TONE:** Constructive and encouraging. Suggest actionable steps like "Add personal projects", "Include relevant coursework", "Highlight transferable skills from part-time jobs/volunteering"`
       },
       'new_grad': {
         description: 'a NEW GRADUATE with 0-2 years of professional experience',
@@ -99,7 +110,9 @@ export async function POST({ request }) {
 - Focus on growth trajectory, learning ability, and potential
 - Be SUPPORTIVE about combining academic and early professional experience
 - A 1-page resume is IDEAL at this stage
-- Evaluate based on: internships, academic projects, early career accomplishments, and demonstrated skills`
+- Evaluate based on: internships, academic projects, early career accomplishments, and demonstrated skills
+- **SCORING:** Baseline score should be 55-75 for a solid new grad resume. Reward internships and academic projects.
+- **FEEDBACK TONE:** Balance honesty with encouragement. Suggest "Quantify internship achievements", "Add technical projects", "Highlight leadership in clubs/organizations"`
       },
       'professional': {
         description: 'a PROFESSIONAL with 2+ years of experience',
@@ -110,7 +123,9 @@ export async function POST({ request }) {
 - Professional achievements should be well-documented with metrics
 - Advanced skills and specialized expertise should be evident
 - Leadership, mentorship, and strategic contributions are important
-- A 2-page resume is acceptable for extensive experience`
+- A 2-page resume is acceptable for extensive experience
+- **SCORING:** Be strict - baseline score 60-80. High scores (85+) require exceptional accomplishments with strong metrics.
+- **FEEDBACK TONE:** Direct and professional. Expect polish and quantified results. Suggest "Quantify all achievements", "Show career progression", "Demonstrate leadership impact"`
       }
     };
 
@@ -253,7 +268,17 @@ Format your response as valid JSON with this exact structure:
     {"priority": 4, "task": "<string>"},
     {"priority": 5, "task": "<string>"}
   ]
-}`
+}
+
+**CRITICAL SCORING GUIDELINES:**
+1. Score based on what the candidate HAS, not what they're missing due to experience level
+2. For interns/new grads with limited experience, a 60-70 score is GOOD if they have solid fundamentals
+3. Suggest ACTIONABLE improvements based on their situation:
+   - Limited experience? → "Build personal projects", "Add relevant coursework", "Seek internships"
+   - Poor formatting? → "Use bullet points", "Add consistent spacing", "Use professional font"
+   - Missing metrics? → "Quantify responsibilities where possible", "Estimate impact (e.g., 'managed 20+ customers')"
+4. overall_assessment should acknowledge their current level and provide hope: "This shows promise for a [career level]. Here's how to strengthen it with what you have..."
+5. Action items should be ACHIEVABLE for their situation - don't ask an intern to "show 5 years of leadership"`
       }]
     });
 
@@ -271,6 +296,40 @@ Format your response as valid JSON with this exact structure:
         status: 500,
         headers: { 'Content-Type': 'application/json' }
       });
+    }
+
+    const { data: existingProfile } = await authenticatedSupabase
+      .from('user_profiles')
+      .select('id')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (!existingProfile) {
+      const parsedResume = parseResumeTextToStructuredData(resumeText);
+      
+      const profileData = {
+        user_id: userId,
+        full_name: parsedResume.profile.full_name || '',
+        email: parsedResume.profile.email || user.email || '',
+        phone: parsedResume.profile.phone || '',
+        location: parsedResume.profile.location || '',
+        linkedin: parsedResume.profile.linkedin || '',
+        professional_summary: parsedResume.profile.professional_summary || '',
+        skills: parsedResume.profile.skills || '',
+        volunteering: parsedResume.profile.volunteering || '',
+        work_experience: parsedResume.work_experience || [],
+        education: parsedResume.education || [],
+        projects: parsedResume.projects || [],
+        has_work_experience: parsedResume.work_experience.length > 0,
+        has_education: parsedResume.education.length > 0,
+        has_projects: parsedResume.projects.length > 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      await authenticatedSupabase
+        .from('user_profiles')
+        .insert(profileData);
     }
 
     // Store analysis in Supabase (use authenticated client)

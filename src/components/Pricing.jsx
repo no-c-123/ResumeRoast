@@ -1,41 +1,11 @@
 import React, { useState, useEffect } from "react";
+import PaywallModal from "./PaywallModal.jsx";
 
 export default function Pricing() {
-    const [ showPaywallModal, setShowPaywallModal ] = useState(false);
-
-    useEffect(() => {
-        if (showPaywallModal) {
-            document.body.style.overflow = 'hidden';
-        } else {
-            document.body.style.overflow = 'unset';
-        }
-
-        addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                setShowPaywallModal(false);
-            }
-        })
-        
-        return () => {
-            document.body.style.overflow = 'unset';
-        };
-
-        
-    }, [showPaywallModal]);
 
     return (
         <>
-            <div className={`fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] md:w-2/3 h-[60vh] md:h-[60vh] transition-all ease-in-out duration-500 [background:linear-gradient(#0c0c0e,#0c0c0e)_padding-box,conic-gradient(from_var(--border-angle),theme(colors.orange.600)_80%,_theme(colors.orange.500)_86%,_theme(colors.orange.300)_90%,_theme(colors.orange.500)_94%,_theme(colors.orange.600))_border-box] rounded-3xl border-[3px] border-transparent [animation:border_4s_linear_infinite] z-50 flex justify-center items-center ${showPaywallModal ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
-                <button 
-                    onClick={() => setShowPaywallModal(false)}
-                    className="absolute top-4 right-4 text-neutral-400 hover:text-white transition-colors"
-                >
-                    <svg className="w-6 h-6 md:w-8 md:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/>
-                    </svg>
-                </button>
-            </div>
-            <div className={`w-full min-h-screen flex flex-col justify-center items-center pt-20 pb-20 px-4 gap-6 transform-flat ${showPaywallModal ? 'blur-lg' : ' '}`}>
+            <div className={`w-full min-h-screen flex flex-col justify-center items-center pt-20 pb-20 px-4 gap-6 transform-flat`}>
             
                 
 
@@ -121,7 +91,7 @@ export default function Pricing() {
                                 <p className="text-neutral-400">Priority customer support</p>
                             </div>
                         </li>
-                        <button className="w-full max-w-96 mx-4 h-11 text-white font-bold text-lg bg-orange-500 rounded-2xl mt-11 hover:bg-orange-500/90" onClick={() => setShowPaywallModal(true)}> Get Started </button>
+                        <button className="w-full max-w-96 mx-4 h-11 text-white font-bold text-lg bg-orange-500 rounded-2xl mt-11 hover:bg-orange-500/90" onClick={() => window.location.href='/payment'}> Get Started </button>
                     </div>
 
                     {/* One-Time Payment Plan */}
@@ -167,7 +137,7 @@ export default function Pricing() {
                                 <p className="text-neutral-400">Priority customer support</p>
                             </div>
                         </li>
-                        <button className="w-full max-w-96 mx-4 h-11 text-white font-bold text-lg bg-orange-500 rounded-2xl mt-2 hover:bg-orange-500/90" onClick={() => setShowPaywallModal(true)}> Get Started </button>
+                        <button className="w-full max-w-96 mx-4 h-11 text-white font-bold text-lg bg-orange-500 rounded-2xl mt-2 hover:bg-orange-500/90" onClick={() => window.location.href='/payment'}> Get Started </button>
                     </div>
                 </div>
 

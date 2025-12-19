@@ -1,4 +1,17 @@
+import Anthropic from '@anthropic-ai/sdk';
+import { createClient } from '@supabase/supabase-js';
+import { parseResumeTextToStructuredData } from '../../lib/resumeParser.js';
+
 export const prerender = false;
+
+const anthropic = new Anthropic({
+  apiKey: import.meta.env.ANTHROPIC_API_KEY
+});
+
+const supabase = createClient(
+  import.meta.env.PUBLIC_SUPABASE_URL,
+  import.meta.env.PUBLIC_SUPABASE_ANON_KEY
+);
 
 export async function POST({ request }) {
     try {
@@ -17,7 +30,6 @@ export async function POST({ request }) {
             });
         }
 
-        // Check authorization
         const authHeader = request.headers.get('Authorization');
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
             return new Response(JSON.stringify({
@@ -29,101 +41,140 @@ export async function POST({ request }) {
             });
         }
 
-        // Call Claude API to tailor the resume
-        const anthropicApiKey = import.meta.env.ANTHROPIC_API_KEY;
+        const sessionToken = authHeader.replace('Bearer ', '');
+        const { data: { user }, error: authError } = await supabase.auth.getUser(sessionToken);
         
-        if (!anthropicApiKey) {
-            console.error('ANTHROPIC_API_KEY is not set');
+        if (authError || !user) {
             return new Response(JSON.stringify({
                 success: false,
-                error: 'API key not configured'
+                error: 'Unauthorized'
+            }), {
+                status: 401,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+
+        const parsedResume = parseResumeTextToStructuredData(resumeText);
+        
+        const { data: profileData } = await supabase
+            .from('user_profiles')
+            .select('*')
+            .eq('user_id', user.id)
+            .maybeSingle();
+
+        const resumeData = {
+            profile: {
+                full_name: parsedResume.profile.full_name || profileData?.full_name || '',
+                professional_summary: parsedResume.profile.professional_summary || profileData?.professional_summary || '',
+                email: parsedResume.profile.email || profileData?.email || user.email,
+                phone: parsedResume.profile.phone || profileData?.phone || '',
+                location: parsedResume.profile.location || profileData?.location || '',
+                linkedin: parsedResume.profile.linkedin || profileData?.linkedin || '',
+                skills: parsedResume.profile.skills || profileData?.skills || '',
+                volunteering: parsedResume.profile.volunteering || profileData?.volunteering || ''
+            },
+            work_experience: parsedResume.work_experience.length > 0 ? parsedResume.work_experience : (profileData?.work_experience || []),
+            education: parsedResume.education.length > 0 ? parsedResume.education : (profileData?.education || []),
+            projects: profileData?.projects || []
+        };
+
+        const message = await anthropic.messages.create({
+            model: "claude-sonnet-4-20250514",
+            max_tokens: 4000,
+            temperature: 0.7,
+            messages: [{
+                role: "user",
+                content: `You are an expert resume writer specializing in tailoring resumes for specific job postings and ATS optimization.
+
+JOB DESCRIPTION:
+${jobDescription}
+
+CURRENT RESUME DATA:
+${JSON.stringify(resumeData, null, 2)}
+
+TASK: Tailor this resume specifically for the job description above. Rewrite sections to:
+1. Include job-specific keywords naturally throughout
+2. Emphasize relevant experience and skills that match the job requirements
+3. Reframe achievements to align with what the job is looking for
+4. Add or modify skills section to include relevant keywords from the job description
+5. Update professional summary to highlight relevant qualifications for this specific role
+6. Modify work experience descriptions to use terminology from the job description where appropriate
+
+IMPORTANT RULES:
+- Keep all actual experience and facts - don't make up fake accomplishments
+- Use "|" as separator between bullet points in work experience descriptions
+- Maintain professional tone and accuracy
+- Only add skills/qualifications that are reasonable given the person's experience
+- Make changes that increase ATS match score while staying truthful
+
+Return the tailored resume in this exact JSON format:
+{
+  "profile": {
+    "full_name": "string",
+    "email": "string",
+    "phone": "string",
+    "location": "string",
+    "linkedin": "string",
+    "professional_summary": "string (tailored for this job)",
+    "skills": "string (include job-relevant keywords)",
+    "volunteering": "string"
+  },
+  "work_experience": [
+    {
+      "position": "string",
+      "company": "string",
+      "location": "string",
+      "start_date": "string",
+      "end_date": "string",
+      "description": "string (use | to separate bullet points, tailored for job)"
+    }
+  ],
+  "education": [
+    {
+      "degree": "string",
+      "institution": "string",
+      "location": "string",
+      "graduation_date": "string"
+    }
+  ],
+  "projects": [
+    {
+      "title": "string",
+      "link": "string",
+      "description": "string",
+      "tech": "string"
+    }
+  ],
+  "match_score": 85,
+  "key_changes": ["string array of what was changed and why"],
+  "keywords_added": ["string array of keywords from job description that were incorporated"]
+}`
+            }]
+        });
+
+        let tailoredResume;
+        try {
+            const responseText = message.content[0].text;
+            const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/) || responseText.match(/```\n([\s\S]*?)\n```/) || responseText.match(/\{[\s\S]*\}/);
+            const cleanJson = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : responseText;
+            tailoredResume = JSON.parse(cleanJson);
+        } catch (parseError) {
+            console.error('Failed to parse AI response:', parseError);
+            return new Response(JSON.stringify({ 
+                error: 'Failed to parse AI response',
+                rawResponse: message.content[0].text 
             }), {
                 status: 500,
                 headers: { 'Content-Type': 'application/json' }
             });
         }
 
-        const prompt = `You are an expert resume consultant specializing in ATS optimization and job matching.
-
-RESUME:
-${resumeText}
-
-JOB DESCRIPTION:
-${jobDescription}
-
-TASK: Analyze how well this resume matches the job description and provide tailored recommendations.
-
-Provide your response in this JSON format:
-{
-  "matchScore": [number 0-100],
-  "keywords": ["keyword1", "keyword2", ...],
-  "changes": [
-    "Specific recommendation 1",
-    "Specific recommendation 2",
-    ...
-  ],
-  "missingSkills": ["skill1", "skill2", ...],
-  "strengthsToEmphasize": ["strength1", "strength2", ...],
-  "sectionsToRevise": {
-    "summary": "Revised summary that includes job-specific keywords...",
-    "experience": ["Revised bullet point 1", "Revised bullet point 2", ...]
-  }
-}
-
-Focus on:
-1. Extracting key requirements and qualifications from the job description
-2. Identifying matching keywords between resume and job posting
-3. Suggesting specific changes to increase ATS match score
-4. Highlighting missing skills that should be added (if applicable)
-5. Recommending which achievements to emphasize based on job requirements`;
-
-        const response = await fetch('https://api.anthropic.com/v1/messages', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-api-key': anthropicApiKey,
-                'anthropic-version': '2023-06-01'
-            },
-            body: JSON.stringify({
-                model: 'claude-sonnet-4-20250514',
-                max_tokens: 8000,
-                messages: [{
-                    role: 'user',
-                    content: prompt
-                }]
-            })
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Claude API error:', errorText);
-            throw new Error(`Claude API error: ${response.status}`);
-        }
-
-        const data = await response.json();
-        const contentBlock = data.content?.[0];
-        
-        if (!contentBlock || contentBlock.type !== 'text') {
-            throw new Error('Unexpected response format from Claude API');
-        }
-
-        // Parse the JSON response from Claude
-        let tailoredAnalysis;
-        try {
-            const jsonMatch = contentBlock.text.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-                tailoredAnalysis = JSON.parse(jsonMatch[0]);
-            } else {
-                throw new Error('No JSON found in response');
-            }
-        } catch (parseError) {
-            console.error('Failed to parse Claude response:', contentBlock.text);
-            throw new Error('Failed to parse AI response');
-        }
-
         return new Response(JSON.stringify({
             success: true,
-            tailored: tailoredAnalysis
+            tailored_resume: tailoredResume,
+            match_score: tailoredResume.match_score || 0,
+            key_changes: tailoredResume.key_changes || [],
+            keywords_added: tailoredResume.keywords_added || []
         }), {
             status: 200,
             headers: { 'Content-Type': 'application/json' }

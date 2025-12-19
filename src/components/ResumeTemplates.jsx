@@ -1,9 +1,38 @@
 // ATS-Friendly Resume Templates
 // All templates use single-column layouts, standard fonts, and avoid graphics/tables
 
-export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkExperience, workExperience, hasEducation, education }) => {
+// Helper function to auto-fix dates if they're entered backwards
+const formatDateRange = (startDate, endDate, isCurrent) => {
+    if (!startDate && !endDate) return '';
+    
+    // Auto-fix if dates are backwards (start is more recent than end)
+    let actualStart = startDate;
+    let actualEnd = endDate;
+    
+    if (startDate && endDate && startDate > endDate) {
+        actualStart = endDate;
+        actualEnd = startDate;
+    }
+    
+    const formatDate = (dateStr) => {
+        if (!dateStr) return '';
+        return new Date(dateStr + '-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    };
+    
+    const start = formatDate(actualStart);
+    const end = isCurrent ? 'Present' : formatDate(actualEnd);
+    
+    if (start && end) return `${start} - ${end}`;
+    if (start) return start;
+    return end;
+};
+
+export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkExperience, workExperience, hasEducation, education, hasProjects, projects }) => {
     const template = templates.find(t => t.id === selectedTemplate);
     const accentColor = template?.color || '#2563eb';
+
+    // Projects rendering is inlined in each template below to match the
+    // pattern used by other sections (e.g. {hasWorkExperience && ...}).
     
     // Professional Template - Arial
     if (selectedTemplate === 'professional') {
@@ -47,9 +76,7 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                                     <div className="flex justify-between items-baseline mb-1">
                                         <h3 className="font-bold text-base">{exp.position || 'Position'}</h3>
                                         <span className="text-sm text-neutral-600 whitespace-nowrap ml-4">
-                                            {exp.start_date && new Date(exp.start_date + '-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-                                            {exp.start_date && ' - '}
-                                            {exp.current ? 'Present' : exp.end_date && new Date(exp.end_date + '-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                                            {formatDateRange(exp.start_date, exp.end_date, exp.current)}
                                         </span>
                                     </div>
                                     <p className="text-sm text-neutral-700 mb-2 font-medium">{exp.company}</p>
@@ -71,9 +98,7 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                                     <div className="flex justify-between items-baseline mb-1">
                                         <h3 className="font-bold text-base">{edu.degree || 'Degree'}</h3>
                                         <span className="text-sm text-neutral-600 whitespace-nowrap ml-4">
-                                            {edu.start_date && new Date(edu.start_date + '-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-                                            {edu.start_date && ' - '}
-                                            {edu.current ? 'Present' : edu.end_date && new Date(edu.end_date + '-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                                            {formatDateRange(edu.start_date, edu.end_date, edu.current)}
                                         </span>
                                     </div>
                                     <p className="text-sm text-neutral-700 font-medium">{edu.school}</p>
@@ -82,6 +107,27 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                                     )}
                                 </div>
                             )
+                        ))}
+                    </div>
+                )}
+
+                {(hasProjects || (projects || profile.projects || []).some(p => p && p.title && p.title.toString().trim() !== '')) && (
+                    <div className="mb-5">
+                        <h2 className="text-lg font-bold mb-2 uppercase tracking-wide" style={{ color: accentColor }}>Projects</h2>
+                        {(projects || profile.projects || []).map((p, i) => (
+                            p && p.title ? (
+                                <div key={i} className="mb-3">
+                                    <div className="flex justify-between items-baseline mb-1">
+                                        <h3 className="font-bold text-base">
+                                            {p.link ? (
+                                                <a href={p.link} target="_blank" rel="noopener noreferrer" className="text-neutral-800 hover:underline">{p.title}</a>
+                                            ) : p.title}
+                                        </h3>
+                                    </div>
+                                    {p.tech && <p className="text-sm text-neutral-700 mb-1">{p.tech}</p>}
+                                    {p.description && <p className="text-sm text-neutral-800 leading-relaxed whitespace-pre-line">{p.description}</p>}
+                                </div>
+                            ) : null
                         ))}
                     </div>
                 )}
@@ -172,6 +218,27 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                     </div>
                 )}
 
+                {(hasProjects || (projects || profile.projects || []).some(p => p && p.title && p.title.toString().trim() !== '')) && (
+                    <div className="mb-5">
+                        <h2 className="text-lg font-bold mb-2 uppercase tracking-wide" style={{ color: accentColor }}>Projects</h2>
+                        {(projects || profile.projects || []).map((p, i) => (
+                            p && p.title ? (
+                                <div key={i} className="mb-3">
+                                    <div className="flex justify-between items-baseline mb-1">
+                                        <h3 className="font-bold text-base">
+                                            {p.link ? (
+                                                <a href={p.link} target="_blank" rel="noopener noreferrer" className="text-neutral-800 hover:underline">{p.title}</a>
+                                            ) : p.title}
+                                        </h3>
+                                    </div>
+                                    {p.tech && <p className="text-sm text-neutral-700 mb-1">{p.tech}</p>}
+                                    {p.description && <p className="text-sm text-neutral-800 leading-relaxed whitespace-pre-line">{p.description}</p>}
+                                </div>
+                            ) : null
+                        ))}
+                    </div>
+                )}
+
                 {profile.volunteering && (
                     <div className="mb-6">
                         <h2 className="text-xl font-bold mb-3 pb-2 border-b-2" style={{ borderColor: accentColor }}>VOLUNTEERING</h2>
@@ -200,6 +267,27 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                     <div className="mb-5">
                         <h2 className="text-lg font-bold mb-2 tracking-wide" style={{ color: accentColor }}>PROFILE</h2>
                         <p className="text-neutral-800 text-sm leading-relaxed">{profile.professional_summary}</p>
+                    </div>
+                )}
+
+                {(hasProjects || (projects || profile.projects || []).some(p => p && p.title && p.title.toString().trim() !== '')) && (
+                    <div className="mb-5">
+                        <h2 className="text-lg font-bold mb-2 tracking-wide" style={{ color: accentColor }}>Projects</h2>
+                        {(projects || profile.projects || []).map((p, i) => (
+                            p && p.title ? (
+                                <div key={i} className="mb-3">
+                                    <div className="flex justify-between items-baseline mb-1">
+                                        <h3 className="font-bold text-base">
+                                            {p.link ? (
+                                                <a href={p.link} target="_blank" rel="noopener noreferrer" className="text-neutral-800 hover:underline">{p.title}</a>
+                                            ) : p.title}
+                                        </h3>
+                                    </div>
+                                    {p.tech && <p className="text-sm text-neutral-700 mb-1">{p.tech}</p>}
+                                    {p.description && <p className="text-sm text-neutral-800 leading-relaxed whitespace-pre-line">{p.description}</p>}
+                                </div>
+                            ) : null
+                        ))}
                     </div>
                 )}
 
@@ -243,9 +331,7 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                                     <div className="font-bold text-base">{edu.degree || 'Degree'}</div>
                                     <div className="text-sm text-neutral-700">{edu.school}</div>
                                     <div className="text-sm text-neutral-600">
-                                        {edu.start_date && new Date(edu.start_date + '-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-                                        {edu.start_date && ' - '}
-                                        {edu.current ? 'Present' : edu.end_date && new Date(edu.end_date + '-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                                        {formatDateRange(edu.start_date, edu.end_date, edu.current)}
                                     </div>
                                     {edu.field && (
                                         <div className="text-sm text-neutral-800">{edu.field}</div>
@@ -293,9 +379,7 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                                     <div className="flex justify-between items-baseline">
                                         <h3 className="font-bold text-base">{exp.position || 'Position'}</h3>
                                         <span className="text-sm text-neutral-600">
-                                            {exp.start_date && new Date(exp.start_date + '-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-                                            {exp.start_date && ' - '}
-                                            {exp.current ? 'Present' : exp.end_date && new Date(exp.end_date + '-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                                            {formatDateRange(exp.start_date, exp.end_date, exp.current)}
                                         </span>
                                     </div>
                                     <div className="text-sm text-neutral-700 italic mb-2">{exp.company}</div>
@@ -317,9 +401,7 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                                     <div className="flex justify-between items-baseline">
                                         <h3 className="font-bold text-base">{edu.degree || 'Degree'}</h3>
                                         <span className="text-sm text-neutral-600">
-                                            {edu.start_date && new Date(edu.start_date + '-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-                                            {edu.start_date && ' - '}
-                                            {edu.current ? 'Present' : edu.end_date && new Date(edu.end_date + '-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                                            {formatDateRange(edu.start_date, edu.end_date, edu.current)}
                                         </span>
                                     </div>
                                     <div className="text-sm text-neutral-700 italic">{edu.school}</div>
@@ -332,18 +414,30 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                     </div>
                 )}
 
-                {profile.skills && (
+                {(hasProjects || (projects || profile.projects || []).some(p => p && p.title && p.title.toString().trim() !== '')) && (
                     <div className="mb-5">
-                        <h2 className="text-base font-bold mb-2 pb-1 border-b border-neutral-300">SKILLS</h2>
-                        <p className="text-neutral-800 text-sm leading-loose">
-                            {profile.skills}
-                        </p>
+                        <h2 className="text-lg font-bold mb-2 uppercase tracking-wide" style={{ color: accentColor }}>Projects</h2>
+                        {(projects || profile.projects || []).map((p, i) => (
+                            p && p.title ? (
+                                <div key={i} className="mb-3">
+                                    <div className="flex justify-between items-baseline mb-1">
+                                        <h3 className="font-bold text-base">
+                                            {p.link ? (
+                                                <a href={p.link} target="_blank" rel="noopener noreferrer" className="text-neutral-800 hover:underline">{p.title}</a>
+                                            ) : p.title}
+                                        </h3>
+                                    </div>
+                                    {p.tech && <p className="text-sm text-neutral-700 mb-1">{p.tech}</p>}
+                                    {p.description && <p className="text-sm text-neutral-800 leading-relaxed whitespace-pre-line">{p.description}</p>}
+                                </div>
+                            ) : null
+                        ))}
                     </div>
                 )}
 
                 {profile.volunteering && (
                     <div className="mb-5">
-                        <h2 className="text-base font-bold mb-2 pb-1 border-b border-neutral-300">VOLUNTEER ACTIVITIES</h2>
+                        <h2 className="text-lg font-bold mb-2 tracking-wide" style={{ color: accentColor }}>Volunteering</h2>
                         <p className="text-neutral-800 text-sm leading-loose">{profile.volunteering}</p>
                     </div>
                 )}
@@ -380,9 +474,7 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                                     <div className="flex justify-between items-baseline mb-1">
                                         <h3 className="font-semibold text-base">{exp.position || 'Position'}</h3>
                                         <span className="text-xs text-neutral-500">
-                                            {exp.start_date && new Date(exp.start_date + '-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-                                            {exp.start_date && ' – '}
-                                            {exp.current ? 'Present' : exp.end_date && new Date(exp.end_date + '-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                                            {formatDateRange(exp.start_date, exp.end_date, exp.current)}
                                         </span>
                                     </div>
                                     <div className="text-sm text-neutral-600 mb-2">{exp.company}</div>
@@ -404,9 +496,7 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                                     <div className="flex justify-between items-baseline mb-1">
                                         <h3 className="font-semibold text-base">{edu.degree || 'Degree'}</h3>
                                         <span className="text-xs text-neutral-500">
-                                            {edu.start_date && new Date(edu.start_date + '-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-                                            {edu.start_date && ' – '}
-                                            {edu.current ? 'Present' : edu.end_date && new Date(edu.end_date + '-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                                            {formatDateRange(edu.start_date, edu.end_date, edu.current)}
                                         </span>
                                     </div>
                                     <div className="text-sm text-neutral-600">{edu.school}</div>
@@ -481,9 +571,7 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                                         <div className="flex justify-between items-baseline">
                                             <h3 className="font-bold text-base">{exp.position || 'Position'}</h3>
                                             <span className="text-sm text-neutral-600 italic">
-                                                {exp.start_date && new Date(exp.start_date + '-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-                                                {exp.start_date && ' - '}
-                                                {exp.current ? 'Present' : exp.end_date && new Date(exp.end_date + '-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                                                {formatDateRange(exp.start_date, exp.end_date, exp.current)}
                                             </span>
                                         </div>
                                         <div className="text-sm text-neutral-700 font-medium">{exp.company}</div>
@@ -506,9 +594,7 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                                     <div className="flex justify-between items-baseline">
                                         <h3 className="font-bold text-base">{edu.degree || 'Degree'}</h3>
                                         <span className="text-sm text-neutral-600 italic">
-                                            {edu.start_date && new Date(edu.start_date + '-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-                                            {edu.start_date && ' - '}
-                                            {edu.current ? 'Present' : edu.end_date && new Date(edu.end_date + '-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                                            {formatDateRange(edu.start_date, edu.end_date, edu.current)}
                                         </span>
                                     </div>
                                     <div className="text-sm text-neutral-700 font-medium">{edu.school}</div>

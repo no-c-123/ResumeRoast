@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { generateImprovedResume, generateResumeHTML, downloadResumePDF } from '../lib/resumeGenerator';
-import ResumeEditorModal from './ResumeEditorModal';
+import { jsPDF } from 'jspdf';
+import { checkDownloadLimit, recordDownload } from '../lib/subscriptionUtils';
+import { parseResumeTextToStructuredData } from '../lib/resumeParser';
 
 function AnalysisResultsPage({ analysisId }) {
     const [analysis, setAnalysis] = useState(null);
@@ -13,14 +14,38 @@ function AnalysisResultsPage({ analysisId }) {
     const [jobDescription, setJobDescription] = useState('');
     const [tailoring, setTailoring] = useState(false);
     const [tailoredResult, setTailoredResult] = useState(null);
+    const [tailoredResume, setTailoredResume] = useState(null);
     const [downloadingResume, setDownloadingResume] = useState(false);
-    const [showResumeEditor, setShowResumeEditor] = useState(false);
-    const [resumeData, setResumeData] = useState(null);
+    const [downloadingTailored, setDownloadingTailored] = useState(false);
+    const [improvedResume, setImprovedResume] = useState(null);
+    const [improvementNotes, setImprovementNotes] = useState('');
+    const [isImproving, setIsImproving] = useState(false);
+    const [userProfile, setUserProfile] = useState(null);
 
     useEffect(() => {
         fetchAnalysis();
         checkPremiumStatus();
+        fetchUserProfile();
     }, [analysisId]);
+
+    const fetchUserProfile = async () => {
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) return;
+
+            const { data } = await supabase
+                .from('user_profiles')
+                .select('*')
+                .eq('user_id', session.user.id)
+                .single();
+            
+            if (data) {
+                setUserProfile(data);
+            }
+        } catch (err) {
+            console.log('Error fetching user profile:', err);
+        }
+    };
 
     const fetchAnalysis = async () => {
         try {
@@ -72,71 +97,85 @@ function AnalysisResultsPage({ analysisId }) {
         }
     };
 
-    const handleDownloadResume = async () => {
-        if (!analysis) return;
+    const handleImproveWithAI = async () => {
+        setIsImproving(true);
         
         try {
-            // Fetch user profile from database
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) {
-                alert('Please log in to download your resume');
+                alert('Please log in to use AI improvement');
+                setIsImproving(false);
                 return;
             }
 
-            const { data: profileData, error: profileError } = await supabase
-                .from('user_profiles')
-                .select('*')
-                .eq('user_id', session.user.id)
-                .single();
-
-            let data;
-            if (profileData) {
-                // Use profile data from database
-                data = {
-                    name: profileData.full_name || '',
-                    location: profileData.location || '',
-                    phone: profileData.phone || '',
-                    email: profileData.email || session.user.email || '',
-                    linkedin: profileData.linkedin || '',
-                    summary: profileData.professional_summary || '',
-                    skills: profileData.skills || '',
-                    volunteering: profileData.volunteering || ''
-                };
-            } else {
-                // Fallback to parsing if no profile exists
-                data = generateImprovedResume(
-                    { suggestions: analysis.suggestions },
-                    analysis.analysis_text
-                );
-                
-                // Show message to user
-                alert('Tip: Save your information in the Resume Builder for faster downloads!');
-            }
+            // Parse the raw text into structured data to help the AI
+            const parsedData = parseResumeTextToStructuredData(analysis.analysis_text);
             
-            // Store it and show the editor modal
-            setResumeData(data);
-            setShowResumeEditor(true);
+            // Merge with user profile if available, prioritizing profile data
+            const structuredData = {
+                profile: {
+                    full_name: userProfile?.full_name || parsedData.profile.full_name || '',
+                    email: userProfile?.email || parsedData.profile.email || '',
+                    phone: userProfile?.phone || parsedData.profile.phone || '',
+                    location: userProfile?.location || parsedData.profile.location || '',
+                    linkedin: userProfile?.linkedin || parsedData.profile.linkedin || '',
+                    professional_summary: userProfile?.professional_summary || parsedData.profile.professional_summary || '',
+                    skills: userProfile?.skills || parsedData.profile.skills || '',
+                    volunteering: userProfile?.volunteering || parsedData.profile.volunteering || ''
+                },
+                work_experience: (userProfile?.work_experience?.length > 0) ? userProfile.work_experience : parsedData.work_experience,
+                education: (userProfile?.education?.length > 0) ? userProfile.education : parsedData.education,
+                projects: (userProfile?.projects?.length > 0) ? userProfile.projects : parsedData.projects
+            };
+
+            const response = await fetch('/api/improve-resume', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    userId: session.user.id,
+                    sessionToken: session.access_token,
+                    resumeText: analysis.analysis_text,
+                    resumeData: structuredData, // Send structured data
+                    analysisId: analysis.id
+                })
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || 'Failed to improve resume');
+            }
+
+            const improvedData = result.improved_resume;
+            setImprovedResume(improvedData);
+            
+            if (result.changes_made) {
+                if (Array.isArray(result.changes_made)) {
+                    setImprovementNotes(result.changes_made.join('\n'));
+                } else if (typeof result.changes_made === 'string') {
+                    setImprovementNotes(result.changes_made);
+                } else {
+                    setImprovementNotes('Resume improved successfully!');
+                }
+            } else {
+                setImprovementNotes('Resume improved successfully!');
+            }
         } catch (err) {
-            console.error('Error preparing resume:', err);
-            alert('Error preparing resume. Please try again.');
+            console.error('Error improving resume:', err);
+            alert('Error improving resume: ' + err.message);
+        } finally {
+            setIsImproving(false);
         }
     };
 
-    const handleSaveAndDownload = async (editedData) => {
-        setDownloadingResume(true);
-        try {
-            const htmlContent = await generateResumeHTML(editedData, analysis.analysis_text);
-            if (htmlContent) {
-                downloadResumePDF(htmlContent, `improved-${analysis.file_name}.pdf`);
-            } else {
-                alert('Error generating resume. Please try again.');
-            }
-        } catch (err) {
-            console.error('Error downloading resume:', err);
-            alert('Error downloading resume. Please try again.');
-        } finally {
-            setDownloadingResume(false);
-        }
+    const handleDownloadResume = () => {
+        if (!improvedResume) return;
+        
+        localStorage.setItem('improvedResumeData', JSON.stringify(improvedResume));
+        localStorage.setItem('improvementNotes', JSON.stringify(improvementNotes.split('\n')));
+        window.location.href = '/resume-builder?improved=true';
     };
 
     const handleTailorResume = async () => {
@@ -152,6 +191,7 @@ function AnalysisResultsPage({ analysisId }) {
 
         setTailoring(true);
         setTailoredResult(null);
+        setTailoredResume(null);
 
         try {
             const { data: { session } } = await supabase.auth.getSession();
@@ -171,16 +211,216 @@ function AnalysisResultsPage({ analysisId }) {
             });
 
             if (!response.ok) {
-                throw new Error('Failed to tailor resume');
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to tailor resume');
             }
 
             const result = await response.json();
-            setTailoredResult(result.tailored);
+            
+            const tailoredData = result.tailored_resume;
+            
+            localStorage.setItem('tailoredResumeData', JSON.stringify(tailoredData));
+            localStorage.setItem('tailorResult', JSON.stringify({
+                matchScore: result.match_score,
+                keyChanges: result.key_changes,
+                keywordsAdded: result.keywords_added
+            }));
+            
+            window.location.href = '/resume-builder?tailored=true';
         } catch (err) {
             console.error('Error tailoring resume:', err);
-            alert('Error tailoring resume. Please try again.');
+            alert('Error tailoring resume: ' + err.message);
         } finally {
             setTailoring(false);
+        }
+    };
+
+    const handleDownloadTailoredResume = async () => {
+        if (!tailoredResume) return;
+        setDownloadingTailored(true);
+        
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                alert('Please log in to download your resume');
+                setDownloadingTailored(false);
+                return;
+            }
+
+            const limitCheck = await checkDownloadLimit(session.user.id);
+            
+            if (!limitCheck.canDownload) {
+                const resetDate = new Date(limitCheck.resetDate).toLocaleDateString();
+                const message = limitCheck.plan === 'free' 
+                    ? `You've reached your monthly download limit (${limitCheck.maxDownloads} download${limitCheck.maxDownloads > 1 ? 's' : ''} per month).\n\nUpgrade to Pro or Lifetime for unlimited downloads.\n\nYour limit resets on ${resetDate}.`
+                    : `You've reached your download limit. Your limit resets on ${resetDate}.`;
+                
+                if (confirm(message + '\n\nWould you like to upgrade your plan?')) {
+                    window.location.href = '/payment?plan=pro';
+                }
+                setDownloadingTailored(false);
+                return;
+            }
+
+            await recordDownload(session.user.id, 'tailored');
+            
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const pageHeight = pdf.internal.pageSize.getHeight();
+            const margin = 20;
+            const contentWidth = pageWidth - (margin * 2);
+            let yPos = margin;
+            
+            const addText = (text, size, isBold = false, color = [0, 0, 0]) => {
+                if (!text) return;
+                pdf.setFontSize(size);
+                pdf.setFont('helvetica', isBold ? 'bold' : 'normal');
+                pdf.setTextColor(...color);
+                const lines = pdf.splitTextToSize(text, contentWidth);
+                lines.forEach(line => {
+                    if (yPos > pageHeight - 20) {
+                        pdf.addPage();
+                        yPos = margin;
+                    }
+                    pdf.text(line, margin, yPos);
+                    yPos += size * 0.5;
+                });
+            };
+
+            const addBullet = (text, size = 10) => {
+                if (!text) return;
+                pdf.setFontSize(size);
+                pdf.setFont('helvetica', 'normal');
+                pdf.setTextColor(0, 0, 0);
+                const bulletWidth = 5;
+                const lines = pdf.splitTextToSize(text, contentWidth - bulletWidth);
+                lines.forEach((line, index) => {
+                    if (yPos > pageHeight - 20) {
+                        pdf.addPage();
+                        yPos = margin;
+                    }
+                    if (index === 0) {
+                        pdf.text('•', margin, yPos);
+                    }
+                    pdf.text(line, margin + bulletWidth, yPos);
+                    yPos += size * 0.5;
+                });
+            };
+            
+            pdf.setFontSize(24);
+            pdf.setFont('helvetica', 'bold');
+            const nameWidth = pdf.getTextWidth(tailoredResume.profile.full_name || 'Your Name');
+            pdf.text(tailoredResume.profile.full_name || 'Your Name', (pageWidth - nameWidth) / 2, yPos);
+            yPos += 8;
+            
+            pdf.setFontSize(10);
+            pdf.setFont('helvetica', 'normal');
+            const contactInfo = [tailoredResume.profile.email, tailoredResume.profile.phone, tailoredResume.profile.location].filter(Boolean).join(' | ');
+            const contactWidth = pdf.getTextWidth(contactInfo);
+            pdf.text(contactInfo, (pageWidth - contactWidth) / 2, yPos);
+            yPos += 6;
+            
+            pdf.setDrawColor(0, 0, 0);
+            pdf.setLineWidth(0.5);
+            pdf.line(margin, yPos, pageWidth - margin, yPos);
+            yPos += 8;
+            
+            if (tailoredResume.profile.professional_summary) {
+                addText('PROFESSIONAL SUMMARY', 13, true);
+                yPos += 2;
+                addText(tailoredResume.profile.professional_summary, 10);
+                yPos += 6;
+            }
+            
+            if (tailoredResume.profile.skills) {
+                addText('SKILLS', 13, true);
+                yPos += 2;
+                addText(tailoredResume.profile.skills, 10);
+                yPos += 6;
+            }
+            
+            if (tailoredResume.work_experience && tailoredResume.work_experience.length > 0) {
+                addText('WORK EXPERIENCE', 13, true);
+                yPos += 3;
+                
+                tailoredResume.work_experience.forEach((exp, index) => {
+                    if (exp.position) {
+                        addText(exp.position, 12, true);
+                    }
+                    
+                    const companyInfo = [];
+                    if (exp.company) companyInfo.push(exp.company);
+                    if (exp.location) companyInfo.push(exp.location);
+                    if (companyInfo.length > 0) {
+                        addText(companyInfo.join(', '), 10, false, [60, 60, 60]);
+                    }
+                    
+                    const dateRange = [exp.start_date, exp.end_date || 'Present'].filter(Boolean).join(' - ');
+                    if (dateRange) {
+                        addText(dateRange, 9, false, [100, 100, 100]);
+                    }
+                    
+                    if (exp.description) {
+                        yPos += 1;
+                        const bulletPoints = exp.description.includes('|') 
+                            ? exp.description.split('|').map(b => b.trim())
+                            : [exp.description];
+                        
+                        bulletPoints.forEach(bullet => {
+                            if (bullet.trim()) {
+                                addBullet(bullet.trim(), 10);
+                            }
+                        });
+                    }
+                    
+                    if (index < tailoredResume.work_experience.length - 1) {
+                        yPos += 4;
+                    }
+                });
+                yPos += 6;
+            }
+            
+            if (tailoredResume.education && tailoredResume.education.length > 0) {
+                addText('EDUCATION', 13, true);
+                yPos += 3;
+                
+                tailoredResume.education.forEach((edu, index) => {
+                    if (edu.degree) {
+                        addText(edu.degree, 12, true);
+                    }
+                    
+                    const schoolInfo = [];
+                    if (edu.institution) schoolInfo.push(edu.institution);
+                    if (edu.location) schoolInfo.push(edu.location);
+                    if (schoolInfo.length > 0) {
+                        addText(schoolInfo.join(', '), 10, false, [60, 60, 60]);
+                    }
+                    
+                    if (edu.graduation_date) {
+                        addText(edu.graduation_date, 9, false, [100, 100, 100]);
+                    }
+                    
+                    if (index < tailoredResume.education.length - 1) {
+                        yPos += 4;
+                    }
+                });
+                yPos += 6;
+            }
+            
+            if (tailoredResume.profile.volunteering) {
+                addText('VOLUNTEERING', 13, true);
+                yPos += 2;
+                addText(tailoredResume.profile.volunteering, 10);
+            }
+            
+            const fileName = `${tailoredResume.profile.full_name || 'Resume'}_TAILORED.pdf`;
+            pdf.save(fileName);
+            
+        } catch (err) {
+            console.error('Error downloading tailored resume:', err);
+            alert('Error downloading tailored resume. Please try again.');
+        } finally {
+            setDownloadingTailored(false);
         }
     };
 
@@ -219,25 +459,17 @@ function AnalysisResultsPage({ analysisId }) {
     return (
         <div className="min-h-screen bg-black text-white py-20 px-4 md:px-10 lg:px-20">
             <div className="max-w-4xl mx-auto">
-                {/* Resume Editor Modal */}
-                <ResumeEditorModal
-                    isOpen={showResumeEditor}
-                    onClose={() => setShowResumeEditor(false)}
-                    resumeData={resumeData}
-                    onSave={handleSaveAndDownload}
-                />
-
                 {/* Header */}
                 <div className="flex items-center justify-between mb-8">
-                    <a 
-                        href="/account" 
+                    <button 
+                        onClick={() => window.history.back()}
                         className="flex items-center gap-2 text-neutral-400 hover:text-white transition-colors"
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
                         </svg>
-                        Back to Dashboard
-                    </a>
+                        Back
+                    </button>
                     <p className="text-neutral-400 text-sm">{analysis.file_name}</p>
                 </div>
 
@@ -456,30 +688,79 @@ function AnalysisResultsPage({ analysisId }) {
                     </div>
                 </div>
 
+                {/* AI Improvement Section */}
+                {improvedResume && improvementNotes && (
+                    <div className="mb-8 bg-blue-900/30 border border-blue-500 rounded-xl p-6 animate-fade-in">
+                        <h4 className="text-xl font-semibold text-blue-400 mb-4 flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            AI Improvements Applied
+                        </h4>
+                        <ul className="text-sm text-neutral-300 space-y-2">
+                            {improvementNotes.split('\n').map((note, i) => (
+                                <li key={i} className="flex items-start gap-2">
+                                    <span className="text-blue-400 mt-1">•</span>
+                                    <span>{note}</span>
+                                </li>
+                            ))}
+                        </ul>
+                        <p className="mt-4 text-sm text-neutral-400">
+                            Your improved resume is ready for download below!
+                        </p>
+                    </div>
+                )}
+
                 {/* Action Buttons */}
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                    <button 
-                        onClick={handleDownloadResume}
-                        disabled={downloadingResume}
-                        className="px-8 py-4 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 disabled:from-neutral-700 disabled:to-neutral-600 rounded-xl font-semibold text-lg transition-all flex items-center justify-center gap-2"
-                    >
-                        {downloadingResume ? (
-                            <>
-                                <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                Generating...
-                            </>
-                        ) : (
-                            <>
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                                </svg>
-                                Download Updated Resume
-                            </>
-                        )}
-                    </button>
+                    {!improvedResume && (
+                        <button 
+                            onClick={handleImproveWithAI}
+                            disabled={isImproving}
+                            className="px-8 py-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:from-neutral-700 disabled:to-neutral-600 rounded-xl font-semibold text-lg transition-all flex items-center justify-center gap-2"
+                        >
+                            {isImproving ? (
+                                <>
+                                    <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Improving with AI...
+                                </>
+                            ) : (
+                                <>
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
+                                    </svg>
+                                    Improve with AI
+                                </>
+                            )}
+                        </button>
+                    )}
+                    {improvedResume && (
+                        <button 
+                            onClick={handleDownloadResume}
+                            disabled={downloadingResume}
+                            className="px-8 py-4 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 disabled:from-neutral-700 disabled:to-neutral-600 rounded-xl font-semibold text-lg transition-all flex items-center justify-center gap-2"
+                        >
+                            {downloadingResume ? (
+                                <>
+                                    <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Loading...
+                                </>
+                            ) : (
+                                <>
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                                    </svg>
+                                    Download Improved Resume
+                                </>
+                            )}
+                        </button>
+                    )}
                     {!isPremium && (
                         <a 
                             href="/pricing"
@@ -553,73 +834,128 @@ function AnalysisResultsPage({ analysisId }) {
                         )}
                     </button>
 
-                    {tailoredResult && (
-                        <div className="mt-8 bg-neutral-900 border border-neutral-800 rounded-xl p-6 animate-fade-in">
-                            <h3 className="text-2xl font-bold mb-4 flex items-center gap-2">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6 text-green-500">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                Tailored Results
-                            </h3>
-                            
-                            <div className="space-y-4">
-                                <div>
-                                    <h4 className="font-semibold text-orange-500 mb-2">Keyword Matches</h4>
-                                    <div className="flex flex-wrap gap-2">
-                                        {tailoredResult.keywords?.map((keyword, idx) => (
-                                            <span key={idx} className="px-3 py-1 bg-neutral-800 border border-neutral-700 rounded-full text-sm">
-                                                {keyword}
-                                            </span>
-                                        ))}
+                    {tailoredResume && tailoredResult && (
+                        <div className="mt-8 space-y-6 animate-fade-in">
+                            <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6">
+                                <div className="flex items-center justify-between mb-6">
+                                    <h3 className="text-2xl font-bold flex items-center gap-2">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6 text-green-500">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        Tailored Resume Preview
+                                    </h3>
+                                    {tailoredResult.matchScore && (
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-sm text-neutral-400">Match Score:</span>
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-24 h-2 bg-neutral-800 rounded-full overflow-hidden">
+                                                    <div 
+                                                        className="h-full bg-gradient-to-r from-green-500 to-green-600 rounded-full transition-all duration-1000"
+                                                        style={{ width: `${tailoredResult.matchScore}%` }}
+                                                    />
+                                                </div>
+                                                <span className="text-xl font-bold text-green-500">
+                                                    {tailoredResult.matchScore}%
+                                                </span>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="bg-neutral-800/50 border border-neutral-700 rounded-lg p-6 mb-6">
+                                    <div className="space-y-4">
+                                        <div>
+                                            <h4 className="text-lg font-semibold mb-2">{tailoredResume.profile.full_name}</h4>
+                                            <p className="text-sm text-neutral-400">
+                                                {[tailoredResume.profile.email, tailoredResume.profile.phone, tailoredResume.profile.location].filter(Boolean).join(' • ')}
+                                            </p>
+                                        </div>
+                                        
+                                        {tailoredResume.profile.professional_summary && (
+                                            <div>
+                                                <h5 className="font-semibold text-orange-400 mb-2">Professional Summary</h5>
+                                                <p className="text-sm text-neutral-300">{tailoredResume.profile.professional_summary}</p>
+                                            </div>
+                                        )}
+                                        
+                                        {tailoredResume.profile.skills && (
+                                            <div>
+                                                <h5 className="font-semibold text-orange-400 mb-2">Skills</h5>
+                                                <p className="text-sm text-neutral-300">{tailoredResume.profile.skills}</p>
+                                            </div>
+                                        )}
+                                        
+                                        {tailoredResume.work_experience && tailoredResume.work_experience.length > 0 && (
+                                            <div>
+                                                <h5 className="font-semibold text-orange-400 mb-2">Work Experience</h5>
+                                                <div className="space-y-3">
+                                                    {tailoredResume.work_experience.slice(0, 2).map((exp, idx) => (
+                                                        <div key={idx} className="text-sm">
+                                                            <p className="font-semibold text-white">{exp.position} at {exp.company}</p>
+                                                            <p className="text-neutral-400 text-xs">{exp.start_date} - {exp.end_date || 'Present'}</p>
+                                                            {exp.description && (
+                                                                <p className="text-neutral-300 mt-1 text-xs">
+                                                                    {exp.description.split('|')[0].substring(0, 100)}...
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
-                                <div>
-                                    <h4 className="font-semibold text-blue-500 mb-2">Recommended Changes</h4>
-                                    <ul className="space-y-2">
-                                        {tailoredResult.changes?.map((change, idx) => (
-                                            <li key={idx} className="flex items-start gap-2 text-neutral-300">
-                                                <span className="text-blue-400 mt-1">→</span>
-                                                <span>{change}</span>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
+                                {tailoredResult.keyChanges && tailoredResult.keyChanges.length > 0 && (
+                                    <div className="mb-6">
+                                        <h4 className="font-semibold text-blue-400 mb-3">Key Changes Made</h4>
+                                        <ul className="space-y-2">
+                                            {tailoredResult.keyChanges.map((change, idx) => (
+                                                <li key={idx} className="flex items-start gap-2 text-sm text-neutral-300">
+                                                    <span className="text-blue-400 mt-1">•</span>
+                                                    <span>{change}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
 
-                                {tailoredResult.matchScore && (
-                                    <div>
-                                        <h4 className="font-semibold text-green-500 mb-2">Match Score</h4>
-                                        <div className="flex items-center gap-4">
-                                            <div className="flex-1 h-3 bg-neutral-800 rounded-full overflow-hidden">
-                                                <div 
-                                                    className="h-full bg-gradient-to-r from-green-500 to-green-600 rounded-full transition-all duration-1000"
-                                                    style={{ width: `${tailoredResult.matchScore}%` }}
-                                                />
-                                            </div>
-                                            <span className="text-2xl font-bold text-green-500">
-                                                {tailoredResult.matchScore}%
-                                            </span>
+                                {tailoredResult.keywordsAdded && tailoredResult.keywordsAdded.length > 0 && (
+                                    <div className="mb-6">
+                                        <h4 className="font-semibold text-green-400 mb-3">Keywords Added</h4>
+                                        <div className="flex flex-wrap gap-2">
+                                            {tailoredResult.keywordsAdded.map((keyword, idx) => (
+                                                <span key={idx} className="px-3 py-1 bg-green-500/20 border border-green-500/50 rounded-full text-sm text-green-400">
+                                                    {keyword}
+                                                </span>
+                                            ))}
                                         </div>
                                     </div>
                                 )}
-                            </div>
 
-                            <button
-                                onClick={() => {
-                                    const data = generateImprovedResume(
-                                        { suggestions: tailoredResult },
-                                        analysis.analysis_text
-                                    );
-                                    setResumeData(data);
-                                    setShowResumeEditor(true);
-                                }}
-                                className="mt-6 w-full px-6 py-3 bg-green-600 hover:bg-green-700 rounded-lg font-semibold transition-all flex items-center justify-center gap-2"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                                </svg>
-                                Download Tailored Resume
-                            </button>
+                                <button
+                                    onClick={handleDownloadTailoredResume}
+                                    disabled={downloadingTailored}
+                                    className="w-full px-8 py-4 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 disabled:from-neutral-700 disabled:to-neutral-600 rounded-xl font-semibold text-lg transition-all flex items-center justify-center gap-2"
+                                >
+                                    {downloadingTailored ? (
+                                        <>
+                                            <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            Downloading...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                                            </svg>
+                                            Download Tailored Resume
+                                        </>
+                                    )}
+                                </button>
+                            </div>
                         </div>
                     )}
 

@@ -1,6 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { renderTemplate } from './ResumeTemplates.jsx';
+import { checkDownloadLimit, recordDownload } from '../lib/subscriptionUtils';
+import { extractTextFromFile } from '../lib/fileParser.js';
+import { parseResumeTextToStructuredData } from '../lib/resumeParser.js';
+import Loader from './uicomponents/Loader.jsx';
 
 function ResumeBuilder() {
     const [loading, setLoading] = useState(true);
@@ -38,9 +42,28 @@ function ResumeBuilder() {
     }]);
     const [hasWorkExperience, setHasWorkExperience] = useState(true);
     const [hasEducation, setHasEducation] = useState(true);
+    const [projects, setProjects] = useState([{ id: 1, title: '', link: '', description: '', tech: '' }]);
+    const [hasProjects, setHasProjects] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
     const [isPremium, setIsPremium] = useState(false);
     const [isDownloading, setIsDownloading] = useState(false);
+    const [isImproving, setIsImproving] = useState(false);
+    const [improvedResume, setImprovedResume] = useState(null);
+    const [improvementNotes, setImprovementNotes] = useState('');
+    const [showImprovementNotes, setShowImprovementNotes] = useState(false);
+    const [isNewUser, setIsNewUser] = useState(false);
+    const [showUploadOption, setShowUploadOption] = useState(false);
+    const fileInputRef = useRef(null);
+    const [isUploading, setIsUploading] = useState(false);
+    const [isDragging, setIsDragging] = useState(false);
+    const [uploadError, setUploadError] = useState('');
+
+    const MAX_BYTES = 5 * 1024 * 1024; // 5MB
+    const ACCEPTED = [
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ];
 
     const templates = [
         { 
@@ -56,7 +79,7 @@ function ResumeBuilder() {
             name: 'Classic', 
             description: 'Timeless Georgia font for traditional industries',
             font: 'Georgia, serif',
-            color: '#374151',
+            color: '#000',
             isPremium: false
         },
         { 
@@ -64,7 +87,7 @@ function ResumeBuilder() {
             name: 'Executive', 
             description: 'Sophisticated design with Garamond font',
             font: 'Garamond, serif',
-            color: '#1e40af',
+            color: '#000',
             isPremium: true
         },
         { 
@@ -72,7 +95,7 @@ function ResumeBuilder() {
             name: 'Modern', 
             description: 'Contemporary with Calibri and bold sections',
             font: 'Calibri, sans-serif',
-            color: '#059669',
+            color: '#000',
             isPremium: true
         },
         { 
@@ -80,7 +103,7 @@ function ResumeBuilder() {
             name: 'Minimalist', 
             description: 'Ultra-clean Helvetica design with minimal styling',
             font: 'Helvetica, Arial, sans-serif',
-            color: '#0891b2',
+            color: '#000',
             isPremium: true
         },
         { 
@@ -88,12 +111,16 @@ function ResumeBuilder() {
             name: 'Elegant', 
             description: 'Refined Lora font with subtle accents',
             font: 'Lora, Georgia, serif',
-            color: '#7c3aed',
+            color: '#000',
             isPremium: true
         }
     ];
 
     useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const isNew = urlParams.get('new') === 'true';
+        setIsNewUser(isNew);
+        setShowUploadOption(isNew);
         fetchProfile();
     }, []);
 
@@ -108,6 +135,21 @@ function ResumeBuilder() {
         };
     }, [showPreview]);
 
+    // Helper to check if a value is a placeholder from AI
+    const isPlaceholder = (value) => {
+        if (!value || typeof value !== 'string') return false;
+        const trimmed = value.trim();
+        return (trimmed.startsWith('[') && trimmed.endsWith(']')) || trimmed.toLowerCase().includes('please add');
+    };
+
+    // Helper to get clean value
+    const getCleanValue = (improvedVal, originalVal) => {
+        if (improvedVal && !isPlaceholder(improvedVal)) {
+            return improvedVal;
+        }
+        return originalVal || '';
+    };
+
     const fetchProfile = async () => {
         try {
             const { data: { session } } = await supabase.auth.getSession();
@@ -116,13 +158,53 @@ function ResumeBuilder() {
                 return;
             }
 
+            const urlParams = new URLSearchParams(window.location.search);
+            const isImproved = urlParams.get('improved') === 'true';
+            const isTailored = urlParams.get('tailored') === 'true';
+
+            let improvedData = null;
+            let tailoredData = null;
+
+            if (isImproved) {
+                const stored = localStorage.getItem('improvedResumeData');
+                if (stored) {
+                    improvedData = JSON.parse(stored);
+                    setImprovedResume(improvedData);
+                    const notes = localStorage.getItem('improvementNotes');
+                    if (notes) {
+                        const notesArray = JSON.parse(notes);
+                        setImprovementNotes(Array.isArray(notesArray) ? notesArray.join('\n') : notesArray);
+                        setShowImprovementNotes(true);
+                    }
+                    localStorage.removeItem('improvedResumeData');
+                    localStorage.removeItem('improvementNotes');
+                }
+            }
+
+            if (isTailored) {
+                const stored = localStorage.getItem('tailoredResumeData');
+                if (stored) {
+                    tailoredData = JSON.parse(stored);
+                    setImprovedResume(tailoredData);
+                    const tailorResult = localStorage.getItem('tailorResult');
+                    if (tailorResult) {
+                        const result = JSON.parse(tailorResult);
+                        setImprovementNotes(`Tailored for job posting (Match Score: ${result.matchScore}%)\n\nKey Changes:\n${(result.keyChanges || []).map((c, i) => `${i + 1}. ${c}`).join('\n')}`);
+                        setShowImprovementNotes(true);
+                    }
+                    localStorage.removeItem('tailoredResumeData');
+                    localStorage.removeItem('tailorResult');
+                }
+            }
+
+            const dataToUse = improvedData || tailoredData;
+
             const { data, error } = await supabase
                 .from('user_profiles')
                 .select('*')
                 .eq('user_id', session.user.id)
                 .single();
 
-            // Check premium status
             const { data: subscription } = await supabase
                 .from('user_subscriptions')
                 .select('*')
@@ -131,7 +213,65 @@ function ResumeBuilder() {
             
             setIsPremium(subscription?.plan === 'pro' || subscription?.plan === 'premium');
 
-            if (data) {
+            if (dataToUse) {
+                setProfile({
+                    full_name: getCleanValue(dataToUse.profile?.full_name, data?.full_name),
+                    location: getCleanValue(dataToUse.profile?.location, data?.location),
+                    phone: getCleanValue(dataToUse.profile?.phone, data?.phone),
+                    email: getCleanValue(dataToUse.profile?.email, data?.email || session.user.email),
+                    linkedin: getCleanValue(dataToUse.profile?.linkedin, data?.linkedin),
+                    professional_summary: getCleanValue(dataToUse.profile?.professional_summary, data?.professional_summary),
+                    skills: getCleanValue(dataToUse.profile?.skills, data?.skills),
+                    volunteering: getCleanValue(dataToUse.profile?.volunteering, data?.volunteering)
+                });
+
+                if (dataToUse.work_experience && Array.isArray(dataToUse.work_experience) && dataToUse.work_experience.length > 0) {
+                    const formattedWork = dataToUse.work_experience.map((exp, idx) => ({
+                        id: idx + 1,
+                        company: getCleanValue(exp.company, ''),
+                        position: getCleanValue(exp.position, ''),
+                        start_date: exp.start_date || '',
+                        end_date: exp.end_date || '',
+                        description: getCleanValue(exp.description, ''),
+                        location: getCleanValue(exp.location, ''),
+                        current: exp.end_date?.toLowerCase() === 'present' || exp.current || false
+                    }));
+                    setWorkExperience(formattedWork);
+                    setHasWorkExperience(true);
+                } else if (data?.work_experience && Array.isArray(data.work_experience)) {
+                    setWorkExperience(data.work_experience);
+                }
+
+                if (dataToUse.education && Array.isArray(dataToUse.education) && dataToUse.education.length > 0) {
+                    const formattedEdu = dataToUse.education.map((edu, idx) => ({
+                        id: idx + 1,
+                        school: getCleanValue(edu.institution || edu.school, ''),
+                        degree: getCleanValue(edu.degree, ''),
+                        field: '',
+                        start_date: '',
+                        end_date: edu.graduation_date || '',
+                        current: false
+                    }));
+                    setEducation(formattedEdu);
+                    setHasEducation(true);
+                } else if (data?.education && Array.isArray(data.education)) {
+                    setEducation(data.education);
+                }
+
+                if (dataToUse.projects && Array.isArray(dataToUse.projects) && dataToUse.projects.length > 0) {
+                    const formattedProjects = dataToUse.projects.map((proj, idx) => ({
+                        id: idx + 1,
+                        title: getCleanValue(proj.title, ''),
+                        link: getCleanValue(proj.link, ''),
+                        description: getCleanValue(proj.description, ''),
+                        tech: getCleanValue(proj.tech, '')
+                    }));
+                    setProjects(formattedProjects);
+                    setHasProjects(true);
+                } else if (data?.projects && Array.isArray(data.projects)) {
+                    setProjects(data.projects);
+                }
+            } else if (data) {
                 setProfile({
                     full_name: data.full_name || '',
                     location: data.location || '',
@@ -143,26 +283,31 @@ function ResumeBuilder() {
                     volunteering: data.volunteering || ''
                 });
 
-                // Load work experience if it exists
                 if (data.work_experience && Array.isArray(data.work_experience)) {
                     setWorkExperience(data.work_experience);
                 }
                 
-                // Load education if it exists
                 if (data.education && Array.isArray(data.education)) {
                     setEducation(data.education);
                 }
+
+                if (data.projects && Array.isArray(data.projects)) {
+                    setProjects(data.projects);
+                }
                 
-                // Load flags
                 if (data.has_work_experience !== undefined) {
                     setHasWorkExperience(data.has_work_experience);
                 }
                 if (data.has_education !== undefined) {
                     setHasEducation(data.has_education);
                 }
+                if (data.has_projects !== undefined) {
+                    setHasProjects(data.has_projects);
+                }
             } else {
-                // Pre-fill email from auth
                 setProfile(prev => ({ ...prev, email: session.user.email || '' }));
+                setShowUploadOption(true);
+                setIsNewUser(true);
             }
         } catch (err) {
             console.error('Error fetching profile:', err);
@@ -180,9 +325,16 @@ function ResumeBuilder() {
 
     const handleWorkExperienceChange = (id, field, value) => {
         setWorkExperience(prev =>
-            prev.map(exp =>
-                exp.id === id ? { ...exp, [field]: value } : exp
-            )
+            prev.map(exp => {
+                if (exp.id === id) {
+                    // If checking "current", clear the end_date
+                    if (field === 'current' && value === true) {
+                        return { ...exp, current: true, end_date: '' };
+                    }
+                    return { ...exp, [field]: value };
+                }
+                return exp;
+            })
         );
     };
 
@@ -205,11 +357,39 @@ function ResumeBuilder() {
         }
     };
 
+    // Projects handlers
+    const handleAddProject = () => {
+        const newId = Math.max(...projects.map(p => p.id), 0) + 1;
+        setProjects(prev => [...prev, { id: newId, title: '', link: '', description: '', tech: '' }]);
+        setHasProjects(true);
+    };
+
+    const handleRemoveProject = (id) => {
+        if (projects.length > 1) {
+            setProjects(prev => prev.filter(p => p.id !== id));
+        } else {
+            // if removing last project, clear and mark hasProjects false
+            setProjects([{ id: 1, title: '', link: '', description: '', tech: '' }]);
+            setHasProjects(false);
+        }
+    };
+
+    const handleProjectChange = (id, field, value) => {
+        setProjects(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p));
+    };
+
     const handleEducationChange = (id, field, value) => {
         setEducation(prev =>
-            prev.map(edu =>
-                edu.id === id ? { ...edu, [field]: value } : edu
-            )
+            prev.map(edu => {
+                if (edu.id === id) {
+                    // If checking "current", clear the end_date
+                    if (field === 'current' && value === true) {
+                        return { ...edu, current: true, end_date: '' };
+                    }
+                    return { ...edu, [field]: value };
+                }
+                return edu;
+            })
         );
     };
 
@@ -232,44 +412,322 @@ function ResumeBuilder() {
         }
     };
 
+    const handleImproveWithAI = async () => {
+        setIsImproving(true);
+        
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                alert('Please log in to use AI improvement');
+                setIsImproving(false);
+                return;
+            }
+
+            const resumeData = {
+                profile,
+                work_experience: workExperience,
+                education: education.map(edu => ({
+                    degree: edu.degree,
+                    institution: edu.school,
+                    location: edu.location || '',
+                    graduation_date: edu.graduation_date || (edu.end_date || '')
+                }))
+            };
+
+            const response = await fetch('/api/improve-resume', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    userId: session.user.id,
+                    sessionToken: session.access_token,
+                    resumeData
+                })
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || 'Failed to improve resume');
+            }
+
+            setImprovedResume(result.improved_resume);
+            setShowImprovementNotes(true);
+            alert('Resume improved! Review the changes and download the improved version.');
+
+        } catch (error) {
+            console.error('Error improving resume:', error);
+            alert('Failed to improve resume: ' + error.message);
+        } finally {
+            setIsImproving(false);
+        }
+    };
+
     const handleDownloadResume = async () => {
         setIsDownloading(true);
         
         try {
-            // Import required libraries
-            const html2canvas = (await import('html2canvas')).default;
-            const jsPDF = (await import('jspdf')).jsPDF;
+            // Check user session
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                alert('Please log in to download your resume');
+                setIsDownloading(false);
+                return;
+            }
+
+            // Check download limit
+            const limitCheck = await checkDownloadLimit(session.user.id);
             
-            // Get the preview element
-            const previewElement = document.querySelector('[data-resume-preview]');
+            if (!limitCheck.canDownload) {
+                const resetDate = new Date(limitCheck.resetDate).toLocaleDateString();
+                const message = limitCheck.plan === 'free' 
+                    ? `You've reached your monthly download limit (${limitCheck.maxDownloads} download${limitCheck.maxDownloads > 1 ? 's' : ''} per month).\n\nUpgrade to Pro or Lifetime for unlimited downloads.\n\nYour limit resets on ${resetDate}.`
+                    : `You've reached your download limit. Your limit resets on ${resetDate}.`;
+                
+                if (confirm(message + '\n\nWould you like to upgrade your plan?')) {
+                    window.location.href = '/payment?plan=pro';
+                }
+                setIsDownloading(false);
+                return;
+            }
+
+            // Record download before generating PDF
+            const resumeType = improvedResume ? 'improved' : 'standard';
+            await recordDownload(session.user.id, resumeType);
+
+            const { jsPDF } = await import('jspdf');
+            const pdf = new jsPDF('p', 'mm', 'a4');
             
-            if (!previewElement) {
-                throw new Error('Preview element not found');
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const pageHeight = pdf.internal.pageSize.getHeight();
+            const margin = 20;
+            const contentWidth = pageWidth - (margin * 2);
+            let yPos = margin;
+            
+            // Use improved data if available, otherwise use current data
+            const dataToUse = improvedResume ? improvedResume.profile : profile;
+            const workToUse = improvedResume ? improvedResume.work_experience : workExperience;
+            const eduToUse = improvedResume ? improvedResume.education : education.map(edu => ({
+                degree: edu.degree,
+                institution: edu.school,
+                location: edu.location || '',
+                graduation_date: edu.graduation_date || (edu.end_date || '')
+            }));
+            const projToUse = improvedResume ? (improvedResume.projects || []) : (profile.projects || projects || []);
+            
+            // Helper to add text with word wrap
+            const addText = (text, size, isBold = false, color = [0, 0, 0]) => {
+                if (!text) return;
+                pdf.setFontSize(size);
+                pdf.setFont('helvetica', isBold ? 'bold' : 'normal');
+                pdf.setTextColor(...color);
+                const lines = pdf.splitTextToSize(text, contentWidth);
+                lines.forEach(line => {
+                    if (yPos > pageHeight - 20) {
+                        pdf.addPage();
+                        yPos = margin;
+                    }
+                    pdf.text(line, margin, yPos);
+                    yPos += size * 0.5;
+                });
+            };
+            
+            const addBullet = (text, size = 10) => {
+                if (!text) return;
+                pdf.setFontSize(size);
+                pdf.setFont('helvetica', 'normal');
+                pdf.setTextColor(0, 0, 0);
+                
+                const bulletWidth = 5;
+                const lines = pdf.splitTextToSize(text, contentWidth - bulletWidth);
+                
+                lines.forEach((line, index) => {
+                    if (yPos > pageHeight - 20) {
+                        pdf.addPage();
+                        yPos = margin;
+                    }
+                    if (index === 0) {
+                        pdf.text('•', margin, yPos);
+                    }
+                    pdf.text(line, margin + bulletWidth, yPos);
+                    yPos += size * 0.5;
+                });
+            };
+            
+            const addSpace = (space) => {
+                yPos += space;
+            };
+            
+            // NAME (centered, large)
+            pdf.setFontSize(24);
+            pdf.setFont('helvetica', 'bold');
+            const nameWidth = pdf.getTextWidth(dataToUse.full_name || 'Your Name');
+            pdf.text(dataToUse.full_name || 'Your Name', (pageWidth - nameWidth) / 2, yPos);
+            yPos += 8;
+            
+            // CONTACT INFO (centered)
+            pdf.setFontSize(10);
+            pdf.setFont('helvetica', 'normal');
+            const contactInfo = [dataToUse.email, dataToUse.phone, dataToUse.location].filter(Boolean).join(' | ');
+            const contactWidth = pdf.getTextWidth(contactInfo);
+            pdf.text(contactInfo, (pageWidth - contactWidth) / 2, yPos);
+            yPos += 6;
+            
+            // SEPARATOR LINE
+            pdf.setDrawColor(0, 0, 0);
+            pdf.setLineWidth(0.5);
+            pdf.line(margin, yPos, pageWidth - margin, yPos);
+            yPos += 8;
+            
+            // PROFESSIONAL SUMMARY
+            if (dataToUse.professional_summary) {
+                addText('PROFESSIONAL SUMMARY', 13, true);
+                yPos += 2;
+                addText(dataToUse.professional_summary, 10);
+                yPos += 6;
             }
             
-            // Capture the element as canvas with high quality
-            const canvas = await html2canvas(previewElement, {
-                scale: 2,
-                useCORS: true,
-                logging: false,
-                backgroundColor: '#ffffff',
-                windowWidth: previewElement.scrollWidth,
-                windowHeight: previewElement.scrollHeight
-            });
+            // SKILLS
+            if (dataToUse.skills) {
+                addText('SKILLS', 13, true);
+                yPos += 2;
+                addText(dataToUse.skills, 10);
+                yPos += 6;
+            }
             
-            // Calculate dimensions for A4 page
-            const imgWidth = 210; // A4 width in mm
-            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            // WORK EXPERIENCE
+            if (hasWorkExperience && workToUse.length > 0) {
+                addText('WORK EXPERIENCE', 13, true);
+                yPos += 3;
+                
+                workToUse.forEach((exp, index) => {
+                    // Job Title (bold)
+                    if (exp.position) {
+                        addText(exp.position, 12, true);
+                    }
+                    
+                    // Company and dates on same line
+                    const companyInfo = [];
+                    if (exp.company) companyInfo.push(exp.company);
+                    if (exp.location) companyInfo.push(exp.location);
+                    if (companyInfo.length > 0) {
+                        addText(companyInfo.join(', '), 10, false, [60, 60, 60]);
+                    }
+                    
+                    // Dates
+                    const dateRange = [exp.start_date, exp.end_date || 'Present'].filter(Boolean).join(' - ');
+                    if (dateRange) {
+                        addText(dateRange, 9, false, [100, 100, 100]);
+                    }
+                    
+                    // Description with bullets (check for | separator from AI)
+                    if (exp.description) {
+                        yPos += 1;
+                        const bulletPoints = exp.description.includes('|') 
+                            ? exp.description.split('|').map(b => b.trim())
+                            : exp.description.split(/\.\s+/).filter(s => s.trim());
+                        
+                        if (bulletPoints.length > 1) {
+                            bulletPoints.forEach(bullet => {
+                                if (bullet.trim()) {
+                                    const bulletText = bullet.endsWith('.') ? bullet : bullet + '.';
+                                    addBullet(bulletText, 10);
+                                }
+                            });
+                        } else {
+                            addBullet(exp.description, 10);
+                        }
+                    }
+                    
+                    if (index < workToUse.length - 1) {
+                        yPos += 4;
+                    }
+                });
+                yPos += 6;
+            }
             
-            // Create PDF
-            const pdf = new jsPDF('p', 'mm', 'a4');
-            const imgData = canvas.toDataURL('image/jpeg', 0.95);
+            // EDUCATION
+            if (hasEducation && eduToUse.length > 0) {
+                addText('EDUCATION', 13, true);
+                yPos += 3;
+                
+                eduToUse.forEach((edu, index) => {
+                    // Degree (bold)
+                    if (edu.degree) {
+                        addText(edu.degree, 12, true);
+                    }
+                    
+                    // Institution and location
+                    const schoolInfo = [];
+                    if (edu.institution) schoolInfo.push(edu.institution);
+                    if (edu.location) schoolInfo.push(edu.location);
+                    if (schoolInfo.length > 0) {
+                        addText(schoolInfo.join(', '), 10, false, [60, 60, 60]);
+                    }
+                    
+                    // Graduation date
+                    if (edu.graduation_date) {
+                        addText(edu.graduation_date, 9, false, [100, 100, 100]);
+                    }
+                    
+                    if (index < eduToUse.length - 1) {
+                        yPos += 4;
+                    }
+                });
+                yPos += 6;
+            }
             
-            // Add image to PDF
-            pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
+            // PROJECTS
+            if (projToUse && projToUse.length > 0) {
+                addText('PROJECTS', 13, true);
+                yPos += 3;
+
+                projToUse.forEach((proj, pIdx) => {
+                    if (proj.title) {
+                        // Title (bold) and hyperlinked if link provided
+                        const titleSize = 12;
+                        pdf.setFontSize(titleSize);
+                        pdf.setFont('helvetica', 'bold');
+                        const title = proj.title;
+                        if (yPos > pageHeight - 20) { pdf.addPage(); yPos = margin; }
+                        pdf.text(title, margin, yPos);
+                        const titleWidth = pdf.getTextWidth(title);
+                        if (proj.link) {
+                            try {
+                                pdf.link(margin, yPos - 4, titleWidth, 6, { url: proj.link });
+                            } catch (e) {
+                                // ignore if link fails
+                            }
+                        }
+                        yPos += 6;
+                    }
+
+                    if (proj.tech) {
+                        addText(proj.tech, 10, false, [80, 80, 80]);
+                        yPos += 2;
+                    }
+
+                    if (proj.description) {
+                        addBullet(proj.description, 10);
+                    }
+
+                    if (pIdx < projToUse.length - 1) yPos += 4;
+                });
+                yPos += 6;
+            }
             
-            // Download the PDF
-            const fileName = `${profile.full_name || 'Resume'}_${templates.find(t => t.id === selectedTemplate)?.name}.pdf`;
+            // VOLUNTEERING
+            if (dataToUse.volunteering) {
+                addText('VOLUNTEERING', 13, true);
+                yPos += 2;
+                addText(dataToUse.volunteering, 10);
+            }
+            
+            // Save PDF
+            const fileName = improvedResume 
+                ? `${dataToUse.full_name || 'Resume'}_IMPROVED.pdf`
+                : `${dataToUse.full_name || 'Resume'}.pdf`;
             pdf.save(fileName);
             
         } catch (error) {
@@ -280,22 +738,134 @@ function ResumeBuilder() {
         }
     };
 
+    const validateAndUpload = (file) => {
+        setUploadError('');
+        if (!file) return;
+        
+        // Basic type check based on extension if type is empty/generic
+        const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+        const isDoc = file.type === 'application/msword' || file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || file.name.toLowerCase().endsWith('.doc') || file.name.toLowerCase().endsWith('.docx');
+
+        if (!isPdf && !isDoc) {
+            setUploadError('Unsupported file type. Please upload a PDF or Word document.');
+            return;
+        }
+
+        if (file.size > MAX_BYTES) {
+            setUploadError('File size exceeds 5MB limit. Please upload a smaller file.');
+            return;
+        }
+        
+        handleFileUpload(file);
+    };
+
+    const openFilePicker = () => {
+        setUploadError('');
+        fileInputRef.current?.click();
+    }
+
+    const onDragOver = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(true);
+    };
+
+    const onDragLeave = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+    };
+
+    const onDrop = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+
+        const file = e.dataTransfer.files?.[0];
+        validateAndUpload(file);
+    }
+
+    const handleFileUpload = async (file) => {
+        setIsUploading(true);
+        setUploadError('');
+        try {
+            const resumeText = await extractTextFromFile(file);
+            const parsedData = parseResumeTextToStructuredData(resumeText);
+            
+            setProfile({
+                full_name: parsedData.profile.full_name || '',
+                location: parsedData.profile.location || '',
+                phone: parsedData.profile.phone || '',
+                email: parsedData.profile.email || '',
+                linkedin: parsedData.profile.linkedin || '',
+                professional_summary: parsedData.profile.professional_summary || '',
+                skills: parsedData.profile.skills || '',
+                volunteering: parsedData.profile.volunteering || ''
+            });
+
+            if (parsedData.work_experience && parsedData.work_experience.length > 0) {
+                const formattedWork = parsedData.work_experience.map((exp, idx) => ({
+                    id: idx + 1,
+                    company: exp.company || '',
+                    position: exp.position || '',
+                    start_date: exp.start_date || '',
+                    end_date: exp.end_date || '',
+                    description: exp.description || '',
+                    location: exp.location || '',
+                    current: exp.end_date?.toLowerCase() === 'present' || exp.current || false
+                }));
+                setWorkExperience(formattedWork);
+                setHasWorkExperience(true);
+            }
+
+            if (parsedData.education && parsedData.education.length > 0) {
+                const formattedEdu = parsedData.education.map((edu, idx) => ({
+                    id: idx + 1,
+                    school: edu.institution || edu.school || '',
+                    degree: edu.degree || '',
+                    field: '',
+                    start_date: '',
+                    end_date: edu.graduation_date || '',
+                    current: false
+                }));
+                setEducation(formattedEdu);
+                setHasEducation(true);
+            }
+
+            if (parsedData.projects && parsedData.projects.length > 0) {
+                const formattedProjects = parsedData.projects.map((proj, idx) => ({
+                    id: idx + 1,
+                    title: proj.title || '',
+                    link: proj.link || '',
+                    description: proj.description || '',
+                    tech: proj.tech || ''
+                }));
+                setProjects(formattedProjects);
+                setHasProjects(true);
+            }
+
+            setShowUploadOption(false);
+            setSuccessMessage('Resume uploaded! Please review and update the information below.');
+        } catch (err) {
+            console.error('Error parsing resume:', err);
+            alert('Error parsing resume: ' + err.message);
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
     const handleSave = async () => {
-        console.log('Save button clicked');
         setSaving(true);
         setSuccessMessage('');
         
         try {
             const { data: { session } } = await supabase.auth.getSession();
-            console.log('Session:', session);
             
             if (!session) {
                 alert('Please log in to save your profile');
                 setSaving(false);
                 return;
             }
-
-            console.log('Saving profile:', profile);
 
             const { data, error } = await supabase
                 .from('user_profiles')
@@ -311,26 +881,29 @@ function ResumeBuilder() {
                     volunteering: profile.volunteering,
                     work_experience: hasWorkExperience ? workExperience : [],
                     education: hasEducation ? education : [],
+                    projects: hasProjects ? projects : [],
+                    has_projects: hasProjects,
                     has_work_experience: hasWorkExperience,
                     has_education: hasEducation
                 }, {
                     onConflict: 'user_id'
                 });
 
-            console.log('Upsert result:', { data, error });
-
             if (error) {
-                console.error('Supabase error:', error);
                 throw error;
             }
 
-            console.log('Save successful!');
             setSuccessMessage('Resume information saved successfully!');
             
-            // Show template picker after successful save
-            setTimeout(() => {
-                setShowPreview(true);
-            }, 1000);
+            if (improvedResume || improvementNotes) {
+                setTimeout(() => {
+                    setShowPreview(true);
+                }, 1000);
+            } else {
+                setTimeout(() => {
+                    setShowPreview(true);
+                }, 1000);
+            }
             
             setTimeout(() => setSuccessMessage(''), 5000);
         } catch (err) {
@@ -368,9 +941,115 @@ function ResumeBuilder() {
                 <div className="mb-8">
                     <h1 className="text-4xl md:text-5xl font-bold mb-4">Build Your Resume</h1>
                     <p className="text-neutral-400 text-lg">
-                        Save your information once and use it for all your resumes. This information will automatically populate when you download improved resumes.
+                        {isNewUser 
+                            ? 'Get started by uploading your existing resume or filling out the form below.'
+                            : 'Save your information once and use it for all your resumes. This information will automatically populate when you download improved resumes.'}
                     </p>
                 </div>
+
+                {showUploadOption && (
+                    <div className="mb-8">
+                         <div 
+                            className={`relative flex flex-col justify-center items-center min-h-[400px] border-4 border-dashed rounded-xl p-8 transition-all duration-300 cursor-pointer 
+                                ${isDragging
+                                    ? 'bg-white/10 border-orange-500/80' 
+                                    : 'border-white/20 hover:border-orange-500/50 bg-white/5 hover:bg-white/10' 
+                                }`}
+
+                            onClick={openFilePicker}
+                            onDragOver={onDragOver}
+                            onDragLeave={onDragLeave}
+                            onDrop={onDrop}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ')
+                                    openFilePicker();
+                            }}
+                        >
+                            {isUploading && (
+                                <div className="absolute inset-0 bg-black/70 flex items-center justify-center rounded-xl z-10">
+                                    <Loader />
+                                </div>
+                            )}
+
+                            <img src="/logo-orange.png" alt="logo-orange" className="w-20 h-20 mb-4"/>
+                            
+                            <h2 className="text-white font-bold text-2xl font-outfit mb-3 text-center">
+                                Upload Your Existing Resume
+                            </h2>
+
+                            <p className="text-white/60 text-base font-outfit mb-4 text-center px-4">
+                                Drag & drop your file here to auto-fill your profile
+                            </p>
+
+                            <p className="text-white/40 text-lg font-outfit mb-6"> 
+                                or 
+                            </p>
+                            
+                            <div className="flex flex-col md:flex-row gap-4">
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        openFilePicker();
+                                    }}
+                                    className="w-44 h-11 text-sm bg-gradient-to-r from-[#FF6333FF] to-[#DC2626FF] rounded-2xl hover:opacity-90 duration-300 flex justify-center items-center text-white font-medium"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 mr-3">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5m-9 0h18" />
+                                    </svg>
+                                    Browse Files
+                                </button>
+                                
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setShowUploadOption(false);
+                                    }}
+                                    className="w-44 h-11 text-sm bg-neutral-800 border border-neutral-700 rounded-2xl hover:bg-neutral-700 duration-300 flex justify-center items-center text-white font-medium"
+                                >
+                                    Create from Scratch
+                                </button>
+                            </div>
+                            
+                            <input
+                              ref={fileInputRef}
+                              type="file"
+                              className="hidden"
+                              accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                              onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  validateAndUpload(file);
+                              }}
+                            />
+
+                            <p className="text-white/40 text-sm font-outfit text-center px-2 mt-5">
+                                Accepted: PDF, DOC, DOCX • Max 5MB
+                            </p>
+                            
+                            {uploadError && (
+                                <p className="text-red-500 text-sm font-outfit pt-2 text-center px-2">{uploadError}</p>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {showImprovementNotes && improvementNotes && (
+                    <div className="mb-8 bg-blue-500/20 border border-blue-500 rounded-xl p-6">
+                        <h3 className="text-xl font-bold mb-3 flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6 text-blue-400">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+                            </svg>
+                            AI Improvements Applied
+                        </h3>
+                        <div className="text-neutral-300 whitespace-pre-line">{improvementNotes}</div>
+                        <p className="mt-4 text-sm text-neutral-400">
+                            Please review the changes below and make any adjustments before saving.
+                        </p>
+                    </div>
+                )}
 
                 {successMessage && (
                     <div className="mb-6 p-4 bg-green-500/20 border border-green-500 rounded-lg flex items-center gap-3">
@@ -454,6 +1133,101 @@ function ResumeBuilder() {
                                 />
                             </div>
                         </div>
+                    </div>
+
+                    {/* Projects */}
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
+                            <h2 className="text-2xl font-bold">Projects</h2>
+                            <button
+                                type="button"
+                                onClick={() => setHasProjects(!hasProjects)}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                                    !hasProjects
+                                        ? 'bg-orange-500 text-white'
+                                        : 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'
+                                }`}
+                            >
+                                {hasProjects ? "Hide Projects" : "Add Projects"}
+                            </button>
+                        </div>
+                        {hasProjects && projects.map((proj, idx) => (
+                            <div key={proj.id} className="bg-neutral-800/50 border border-neutral-700 rounded-lg p-6 space-y-4">
+                                <div className="flex items-center justify-between mb-2">
+                                    <h3 className="text-lg font-semibold text-white">Project {idx + 1}</h3>
+                                    {projects.length > 1 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRemoveProject(proj.id)}
+                                            className="text-red-400 hover:text-red-300 transition-colors"
+                                        >
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                        </button>
+                                    )}
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-neutral-300 mb-2">Project Title *</label>
+                                        <input
+                                            type="text"
+                                            value={proj.title}
+                                            onChange={(e) => handleProjectChange(proj.id, 'title', e.target.value)}
+                                            placeholder="Project name"
+                                            className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-4 py-3 text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-neutral-300 mb-2">Project Link</label>
+                                        <input
+                                            type="url"
+                                            value={proj.link}
+                                            onChange={(e) => handleProjectChange(proj.id, 'link', e.target.value)}
+                                            placeholder="https://github.com/you/project"
+                                            className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-4 py-3 text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-neutral-300 mb-2">Description *</label>
+                                    <textarea
+                                        value={proj.description}
+                                        onChange={(e) => handleProjectChange(proj.id, 'description', e.target.value)}
+                                        placeholder="Brief summary of the project, your role, and impact."
+                                        rows={3}
+                                        className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-4 py-3 text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-neutral-300 mb-2">Tech Stack (comma separated)</label>
+                                    <input
+                                        type="text"
+                                        value={proj.tech}
+                                        onChange={(e) => handleProjectChange(proj.id, 'tech', e.target.value)}
+                                        placeholder="React, Node.js, PostgreSQL"
+                                        className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-4 py-3 text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                    />
+                                </div>
+                            </div>
+                        ))}
+
+                        {hasProjects && (
+                            <button
+                                type="button"
+                                onClick={handleAddProject}
+                                className="w-full px-4 py-3 bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 rounded-lg text-white font-medium transition-all flex items-center justify-center gap-2"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                </svg>
+                                Add Another Project
+                            </button>
+                        )}
                     </div>
 
                     {/* Professional Information */}
@@ -1000,6 +1774,55 @@ function ResumeBuilder() {
                         {/* Resume Preview */}
                         <div className="p-6">
                             <h3 className="text-xl font-bold mb-4">Preview</h3>
+                            
+                            {/* Show improvement notification */}
+                            {improvedResume && showImprovementNotes && (
+                                <div className="mb-4 p-4 bg-blue-900/50 border border-blue-500 rounded-lg">
+                                    <div className="flex items-start justify-between mb-2">
+                                        <h4 className="font-bold text-blue-300 flex items-center gap-2">
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+                                            </svg>
+                                            AI Improvements Applied
+                                        </h4>
+                                        <button 
+                                            onClick={() => setShowImprovementNotes(false)}
+                                            className="text-neutral-400 hover:text-white"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                    {improvedResume.improvement_notes && (
+                                        <div className="mb-3">
+                                            <p className="text-sm font-semibold text-blue-200 mb-1">Changes Made:</p>
+                                            <ul className="text-sm text-neutral-300 space-y-1">
+                                                {improvedResume.improvement_notes.map((note, index) => (
+                                                    <li key={index} className="flex items-start gap-2">
+                                                        <span className="text-blue-400 mt-1">•</span>
+                                                        <span>{note}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+                                    {improvedResume.suggestions_for_user && improvedResume.suggestions_for_user.length > 0 && (
+                                        <div>
+                                            <p className="text-sm font-semibold text-green-200 mb-1">Next Steps to Further Improve:</p>
+                                            <ul className="text-sm text-neutral-300 space-y-1">
+                                                {improvedResume.suggestions_for_user.map((suggestion, index) => (
+                                                    <li key={index} className="flex items-start gap-2">
+                                                        <span className="text-green-400 mt-1">→</span>
+                                                        <span>{suggestion}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                            
                             <div 
                                 data-resume-preview
                                 className="bg-white text-black p-8 rounded-lg shadow-2xl max-w-[210mm] mx-auto"
@@ -1008,22 +1831,28 @@ function ResumeBuilder() {
                                 {renderTemplate({ 
                                     selectedTemplate, 
                                     templates, 
-                                    profile, 
+                                    profile: improvedResume ? improvedResume.profile : profile,
                                     hasWorkExperience, 
-                                    workExperience, 
+                                    workExperience: improvedResume ? improvedResume.work_experience : workExperience,
                                     hasEducation, 
-                                    education 
+                                    education: improvedResume ? improvedResume.education.map(edu => ({
+                                        ...edu,
+                                        school: edu.institution,
+                                        graduation_date: edu.graduation_date
+                                    })) : education,
+                                    hasProjects: improvedResume ? !!(improvedResume.projects && improvedResume.projects.length) : hasProjects,
+                                    projects: improvedResume ? improvedResume.projects : projects
                                 })}
                             </div>
                         </div>
 
                         {/* Action Buttons */}
                         <div className="sticky bottom-0 bg-neutral-900 border-t border-neutral-700 p-6">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                 <button
                                     onClick={() => {
                                         setShowPreview(false);
-                                        window.location.href = '/account';
+                                        window.location.href = '/dashboard';
                                     }}
                                     className="px-6 py-3 bg-neutral-700 hover:bg-neutral-600 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
                                 >
@@ -1031,6 +1860,28 @@ function ResumeBuilder() {
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
                                     </svg>
                                     Analyze Resume
+                                </button>
+                                <button
+                                    onClick={handleImproveWithAI}
+                                    disabled={isImproving}
+                                    className="px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {isImproving ? (
+                                        <>
+                                            <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            Improving...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+                                            </svg>
+                                            {improvedResume ? 'Re-Improve' : 'Improve with AI'}
+                                        </>
+                                    )}
                                 </button>
                                 <button
                                     onClick={() => {
@@ -1041,7 +1892,7 @@ function ResumeBuilder() {
                                     className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
                                 >
                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
                                     </svg>
                                     Tailor for Job
                                 </button>
@@ -1063,7 +1914,7 @@ function ResumeBuilder() {
                                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
                                                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
                                             </svg>
-                                            Download Resume
+                                            {improvedResume ? 'Download Improved' : 'Download Resume'}
                                         </>
                                     )}
                                 </button>
