@@ -1,10 +1,12 @@
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { renderTemplate } from './ResumeTemplates.jsx';
-import { checkDownloadLimit, recordDownload } from '../lib/subscriptionUtils';
+import { checkDownloadLimit, recordDownload, checkAiLimit } from '../lib/subscriptionUtils';
+import UpgradeModal from './UpgradeModal.jsx';
 import { extractTextFromFile } from '../lib/fileParser.js';
 import { parseResumeTextToStructuredData } from '../lib/resumeParser.js';
 import Loader from './uicomponents/Loader.jsx';
+import { logger } from '../lib/logger';
 
 function ResumeBuilder() {
     const [loading, setLoading] = useState(true);
@@ -57,6 +59,9 @@ function ResumeBuilder() {
     const [isUploading, setIsUploading] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
     const [uploadError, setUploadError] = useState('');
+    const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+    const [featureName, setFeatureName] = useState('');
+    const [aiLimit, setAiLimit] = useState(null);
 
     const MAX_BYTES = 5 * 1024 * 1024; // 5MB
     const ACCEPTED = [
@@ -134,6 +139,17 @@ function ResumeBuilder() {
             document.body.style.overflow = 'unset';
         };
     }, [showPreview]);
+
+    useEffect(() => {
+        const fetchLimits = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+                 const limit = await checkAiLimit(session.user.id);
+                 setAiLimit(limit);
+            }
+        };
+        fetchLimits();
+    }, []);
 
     // Helper to check if a value is a placeholder from AI
     const isPlaceholder = (value) => {
@@ -310,7 +326,7 @@ function ResumeBuilder() {
                 setIsNewUser(true);
             }
         } catch (err) {
-            console.error('Error fetching profile:', err);
+            logger.error('Error fetching profile:', err);
         } finally {
             setLoading(false);
         }
@@ -413,15 +429,21 @@ function ResumeBuilder() {
     };
 
     const handleImproveWithAI = async () => {
-        setIsImproving(true);
-        
         try {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) {
                 alert('Please log in to use AI improvement');
-                setIsImproving(false);
                 return;
             }
+
+            // Check AI limit
+            if (!isPremium && aiLimit && aiLimit.generationsRemaining <= 0) {
+                setFeatureName('AI Resume Improvement');
+                setUpgradeModalOpen(true);
+                return;
+            }
+
+            setIsImproving(true);
 
             const resumeData = {
                 profile,
@@ -449,15 +471,29 @@ function ResumeBuilder() {
             const result = await response.json();
 
             if (!response.ok) {
+                // If the error is 403, it might be the limit, but we handled it above.
+                // However, if the API returns 403, we should probably show the modal too?
+                if (response.status === 403 && result.error.includes('limit')) {
+                     setFeatureName('AI Resume Improvement');
+                     setUpgradeModalOpen(true);
+                     setIsImproving(false);
+                     return;
+                }
                 throw new Error(result.error || 'Failed to improve resume');
             }
 
             setImprovedResume(result.improved_resume);
             setShowImprovementNotes(true);
+            
+            // Update local limit
+            if (!isPremium && aiLimit) {
+                setAiLimit(prev => ({ ...prev, generationsRemaining: Math.max(0, prev.generationsRemaining - 1) }));
+            }
+
             alert('Resume improved! Review the changes and download the improved version.');
 
         } catch (error) {
-            console.error('Error improving resume:', error);
+            logger.error('Error improving resume:', error);
             alert('Failed to improve resume: ' + error.message);
         } finally {
             setIsImproving(false);
@@ -731,7 +767,7 @@ function ResumeBuilder() {
             pdf.save(fileName);
             
         } catch (error) {
-            console.error('Error downloading resume:', error);
+            logger.error('Error downloading resume:', error);
             alert('Failed to download resume. Please try again.');
         } finally {
             setIsDownloading(false);
@@ -847,7 +883,7 @@ function ResumeBuilder() {
             setShowUploadOption(false);
             setSuccessMessage('Resume uploaded! Please review and update the information below.');
         } catch (err) {
-            console.error('Error parsing resume:', err);
+            logger.error('Error parsing resume:', err);
             alert('Error parsing resume: ' + err.message);
         } finally {
             setIsUploading(false);
@@ -907,7 +943,7 @@ function ResumeBuilder() {
             
             setTimeout(() => setSuccessMessage(''), 5000);
         } catch (err) {
-            console.error('Error saving profile:', err);
+            logger.error('Error saving profile:', err);
             alert(`Error saving profile: ${err.message}`);
         } finally {
             setSaving(false);
@@ -1864,8 +1900,15 @@ function ResumeBuilder() {
                                 <button
                                     onClick={handleImproveWithAI}
                                     disabled={isImproving}
-                                    className="px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed relative"
                                 >
+                                    {!isPremium && (
+                                        <div className="absolute top-[-15px] right-[-15px]">
+                                            <span className="text-white text-[10px] font-bold px-1.5 py-0.5 rounded-2xl [background:linear-gradient(#0c0c0e,#0c0c0e)_padding-box,conic-gradient(from_var(--border-angle),theme(colors.orange.600)_80%,_theme(colors.orange.500)_86%,_theme(colors.orange.300)_90%,_theme(colors.orange.500)_94%,_theme(colors.orange.600))_border-box] border-[3px] border-transparent [animation:border_4s_linear_infinite]">
+                                                {aiLimit && aiLimit.generationsRemaining > 0 ? `${aiLimit.generationsRemaining} left` : 'PRO'}
+                                            </span>
+                                        </div>
+                                    )}
                                     {isImproving ? (
                                         <>
                                             <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -1885,12 +1928,21 @@ function ResumeBuilder() {
                                 </button>
                                 <button
                                     onClick={() => {
+                                        if (!isPremium) {
+                                            window.location.href = '/pricing';
+                                            return;
+                                        }
                                         setShowPreview(false);
                                         // TODO: Implement job description tailoring
                                         alert('Tailor for job description feature coming soon!');
                                     }}
-                                    className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
+                                    className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 relative"
                                 >
+                                    {!isPremium && (
+                                        <div className="absolute top-[-15px] right-[-15px]">
+                                            <span className="text-white text-[10px] font-bold px-1.5 py-0.5 rounded-2xl [background:linear-gradient(#0c0c0e,#0c0c0e)_padding-box,conic-gradient(from_var(--border-angle),theme(colors.orange.600)_80%,_theme(colors.orange.500)_86%,_theme(colors.orange.300)_90%,_theme(colors.orange.500)_94%,_theme(colors.orange.600))_border-box] border-[3px] border-transparent [animation:border_4s_linear_infinite]">PRO</span>
+                                        </div>
+                                    )}
                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
                                     </svg>
@@ -1925,6 +1977,13 @@ function ResumeBuilder() {
             )}
                 </div>
             </div>
+            
+            <UpgradeModal 
+                isOpen={upgradeModalOpen} 
+                onClose={() => setUpgradeModalOpen(false)} 
+                featureName={featureName}
+                remainingRequests={aiLimit?.generationsRemaining || 0}
+            />
         </div>
     );
 }

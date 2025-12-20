@@ -1,45 +1,28 @@
 
 import React, { useState, useEffect } from 'react';
-
-const plans = [
-  {
-    key: 'pro',
-    name: 'Pro Plan',
-    price: '$19.00',
-    priceDetail: '/ month',
-    lookup_key: 'Pro_plan-0d04ed9',
-    features: [
-      '✔️ Unlimited resume analyses',
-      '✔️ Premium templates',
-      '✔️ Priority support',
-      '✔️ Cancel anytime',
-    ],
-    icon: '/proplanIcon.png',
-    button: 'Upgrade to Pro',
-    gradient: 'from-orange-400 via-orange-500 to-red-500',
-  },
-  {
-    key: 'lifetime',
-    name: 'Lifetime Plan',
-    price: '$149',
-    priceDetail: 'one time',
-    lookup_key: 'Lifetime_plan-0d04ed9',
-    price_id: 'price_1SfadPCg8wVUWA0gLWYY3HPb',
-    features: [
-      '✔️ Unlimited resume analyses',
-      '✔️ Premium templates',
-      '✔️ Priority support',
-      '✔️ Pay once, own it forever',
-    ],
-    icon: '/OneTimePaymentIcon.png',
-    button: 'Buy Lifetime Access',
-    gradient: 'from-orange-400 via-orange-500 to-yellow-400',
-  },
-];
+import { logger } from '../lib/logger';
 
 const ProductDisplay = ({ initialTab }) => {
+  const [plans, setPlans] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selectedTab, setSelectedTab] = useState(initialTab || 'pro');
-  const plan = plans.find((p) => p.key === selectedTab);
+
+  useEffect(() => {
+    async function fetchPlans() {
+      try {
+        const res = await fetch('/api/plans');
+        const data = await res.json();
+        setPlans(data);
+      } catch (err) {
+        logger.error('Failed to load plans');
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchPlans();
+  }, []);
+
+  const plan = plans.find((p) => p.key === selectedTab) || plans[0];
 
   const handleCheckout = async () => {
     // Get current user session
@@ -54,7 +37,10 @@ const ProductDisplay = ({ initialTab }) => {
     };
     const response = await fetch('/api/create-checkout-session', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': session ? `Bearer ${session.access_token}` : ''
+      },
       body: JSON.stringify(payload),
     });
     const data = await response.json();
@@ -66,6 +52,17 @@ const ProductDisplay = ({ initialTab }) => {
       alert('Unknown error occurred.');
     }
   };
+
+  if (loading) {
+      return (
+        <div className="flex justify-center items-center h-64">
+             <div className="spinner" style={{ width: 40, height: 40, border: '3px solid rgba(255, 99, 51, 0.1)', borderTopColor: '#FF6333', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+             <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      );
+  }
+  
+  if (!plan) return null;
 
   return (
     <section className="lg:w-full h-full flex flex-col items-center justify-center shadow-2xl mx-auto relative borde">
@@ -81,18 +78,15 @@ const ProductDisplay = ({ initialTab }) => {
         </button>
         {/* Tabs */}
         <div className="flex justify-center gap-2 mb-8 pt-8">
-          <button
-            className={`px-4 py-2 rounded-t-lg font-semibold text-base transition-all duration-200 ${selectedTab === 'pro' ? 'bg-orange-500 text-white' : 'bg-neutral-800 text-orange-300 hover:bg-neutral-700'}`}
-            onClick={() => setSelectedTab('pro')}
-          >
-            Pro Plan
-          </button>
-          <button
-            className={`px-4 py-2 rounded-t-lg font-semibold text-base transition-all duration-200 ${selectedTab === 'lifetime' ? 'bg-orange-500 text-white' : 'bg-neutral-800 text-orange-300 hover:bg-neutral-700'}`}
-            onClick={() => setSelectedTab('lifetime')}
-          >
-            Lifetime
-          </button>
+          {plans.map(p => (
+            <button
+                key={p.key}
+                className={`px-4 py-2 rounded-t-lg font-semibold text-base transition-all duration-200 ${selectedTab === p.key ? 'bg-orange-500 text-white' : 'bg-neutral-800 text-orange-300 hover:bg-neutral-700'}`}
+                onClick={() => setSelectedTab(p.key)}
+            >
+                {p.name}
+            </button>
+          ))}
         </div>
         <div className="flex flex-col items-center gap-4 w-full">
           <img src={plan.icon} alt={plan.name} width="120" height="40" className="mb-2 drop-shadow-lg" />

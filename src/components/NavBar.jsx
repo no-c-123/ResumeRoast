@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { set } from 'astro:schema';
 
 export default function NavBar() {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-    const [currentPath, setCurrentPath] = useState('/');
-
+    const [currentPath, setCurrentPath] = useState('');
     const [isLoggedIn, setIsLoggedIn] = useState(null);
 
     useEffect(() => {
+        // Initial path set
+        if (typeof window !== 'undefined') {
+            setCurrentPath(window.location.pathname);
+        }
+
         const getSession = async () => {
             const { data: { session } } = await supabase.auth.getSession();
             if (session) {
@@ -26,26 +29,17 @@ export default function NavBar() {
             }
         });
 
-        return () => {
-            authListener.subscription.unsubscribe();
-        };
-
-    }, [])
-
-    useEffect(() => {
-        // Set initial path
-        setCurrentPath(window.location.pathname);
-
-        // Listen for Astro page transitions
         const handlePageLoad = () => {
             setCurrentPath(window.location.pathname);
         };
 
         document.addEventListener('astro:page-load', handlePageLoad);
-        
+
         return () => {
+            authListener.subscription.unsubscribe();
             document.removeEventListener('astro:page-load', handlePageLoad);
         };
+
     }, []);
 
     return (

@@ -30,6 +30,72 @@ export async function getUserPlan(userId) {
   }
 }
 
+export async function checkAiLimit(userId) {
+  try {
+    // For now, we will simulate the check using resume_downloads table or just assume 1 free request per month
+    // Ideally we should have a 'ai_generations' table. 
+    // Since we can't easily create a table, we'll use a hack or assume we can create it.
+    // Given the constraints, let's use `resume_downloads` with a special type 'ai_generation' to track it.
+    
+    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+    const nextMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString();
+
+    const { plan } = await getUserPlan(userId);
+    
+    if (['pro', 'premium', 'lifetime'].includes(plan)) {
+        return {
+            canGenerate: true,
+            generationsUsed: 0,
+            generationsRemaining: 9999,
+            maxGenerations: 9999,
+            plan,
+            resetDate: nextMonth
+        };
+    }
+
+    //check usage for free users
+    const { count, error } = await supabase
+        .from('resume_downloads')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('resume_type', 'ai_generation')
+        .gte('downloaded_at', startOfMonth)
+        .lt('downloaded_at', nextMonth);
+
+    if (error) {
+        console.error('Error checking AI limit:', error);
+        // Fail safe: if network error, allow generation (optional, or block)
+        // For now, return false but log it.
+        return { 
+            canGenerate: false, 
+            error: error.message,
+            generationsRemaining: 0,
+            maxGenerations: 5 
+        };
+    }
+
+    const maxGenerations = 5; // Free limit
+    const generationsUsed = count || 0;
+    
+    return {
+        canGenerate: generationsUsed < maxGenerations,
+        generationsUsed,
+        generationsRemaining: Math.max(0, maxGenerations - generationsUsed),
+        maxGenerations,
+        plan: 'free',
+        resetDate: nextMonth
+    };
+
+  } catch (err) {
+    console.error('Error in checkAiLimit:', err);
+    return { canGenerate: false, error: err.message };
+  }
+}
+
+export async function recordAiUsage(userId) {
+    return recordDownload(userId, 'ai_generation');
+}
+
 export async function checkDownloadLimit(userId) {
   try {
     const { data, error } = await supabase.rpc('check_download_limit', {

@@ -11,6 +11,12 @@ export async function extractTextFromFile(file) {
   
   console.log('Extracting text from file type:', fileType);
   
+  // Validate file content magic numbers
+  const isValid = await validateFileContent(file);
+  if (!isValid) {
+      throw new Error('File content does not match its extension. Please upload a valid file.');
+  }
+  
   try {
     if (fileType === 'application/pdf') {
       return await extractFromPDF(file);
@@ -36,6 +42,30 @@ export async function extractTextFromFile(file) {
 async function extractFromPDF(file) {
   console.log('Starting PDF extraction for file:', file.name, 'size:', file.size);
   
+  // Try pdf-parse first as it's generally more reliable for text extraction
+  try {
+    console.log('Attempting extraction with pdf-parse...');
+    const pdf = await import('pdf-parse');
+    // Handle default export for both CommonJS and ESM
+    const pdfParse = pdf.default || pdf;
+    
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    
+    const data = await pdfParse(buffer);
+    
+    if (data && data.text && data.text.trim().length > 50) {
+        console.log('pdf-parse success. Text length:', data.text.length);
+        return data.text.trim();
+    } else {
+        console.log('pdf-parse returned empty or too short text, falling back to pdfreader');
+    }
+  } catch (e) {
+      console.warn('pdf-parse failed:', e);
+      console.log('Falling back to pdfreader...');
+  }
+
+  // Fallback to pdfreader
   try {
     const { PdfReader } = await import('pdfreader');
     
@@ -119,4 +149,50 @@ export function validateResumeFile(file) {
   }
 
   return { valid: true };
+}
+
+// Magic numbers
+const PDF_MAGIC = [0x25, 0x50, 0x44, 0x46]; // %PDF
+const ZIP_MAGIC = [0x50, 0x4B, 0x03, 0x04]; // PK.. (DOCX is a zip)
+const DOC_MAGIC = [0xD0, 0xCF, 0x11, 0xE0]; // DOC
+
+async function validateFileContent(file) {
+    try {
+        const arrayBuffer = await file.slice(0, 4).arrayBuffer();
+        const bytes = new Uint8Array(arrayBuffer);
+        
+        // Check PDF
+        if (file.type === 'application/pdf') {
+            if (bytes[0] === PDF_MAGIC[0] && bytes[1] === PDF_MAGIC[1] && bytes[2] === PDF_MAGIC[2] && bytes[3] === PDF_MAGIC[3]) {
+                return true;
+            }
+            return false;
+        }
+        
+        // Check DOCX
+        if (file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+            if (bytes[0] === ZIP_MAGIC[0] && bytes[1] === ZIP_MAGIC[1] && bytes[2] === ZIP_MAGIC[2] && bytes[3] === ZIP_MAGIC[3]) {
+                return true;
+            }
+            return false;
+        }
+        
+        // Check DOC
+        if (file.type === 'application/msword') {
+            if (bytes[0] === DOC_MAGIC[0] && bytes[1] === DOC_MAGIC[1] && bytes[2] === DOC_MAGIC[2] && bytes[3] === DOC_MAGIC[3]) {
+                return true;
+            }
+            // Some DOC files might vary, but this is standard OLE
+            // Allow if it fails? No, stricter is better for security.
+            // But to avoid false positives on valid but weird DOCs, maybe log warning?
+            // User requirement is "Malicious files could potentially cause issues".
+            // So return false if not matching.
+            return false;
+        }
+        
+        return true; // Unknown type, let existing logic handle
+    } catch (e) {
+        console.error('Error validating file content:', e);
+        return false;
+    }
 }

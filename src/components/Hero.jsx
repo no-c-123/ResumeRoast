@@ -1,5 +1,7 @@
 import {useRef, useState} from "react";
 import Loader from './uicomponents/Loader.jsx';
+import { setFile } from '../lib/storage';
+import { logger } from '../lib/logger';
 
 function Hero() {
 
@@ -35,22 +37,22 @@ function Hero() {
         setIsLoading(true);
         setSelectedFile(file);
         
-        // Convert file to base64 for storage
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const base64Content = e.target.result.split(',')[1];
+        try {
+            await setFile('pendingAnalysisFile', file);
             
-            // Store file data in sessionStorage
-            sessionStorage.setItem('pendingAnalysis', JSON.stringify({
+            // Store metadata in sessionStorage
+            sessionStorage.setItem('pendingAnalysisMeta', JSON.stringify({
                 fileName: file.name,
-                fileContent: base64Content,
                 careerLevel: careerLevel
             }));
             
             // Navigate to analyzing page
             window.location.href = '/analyzing';
-        };
-        reader.readAsDataURL(file);
+        } catch (err) {
+            logger.error('Error saving file:', err);
+            setError('Failed to process file. Please try again.');
+            setIsLoading(false);
+        }
     };
 
     const openFilePicker = () => {

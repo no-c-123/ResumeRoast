@@ -1,49 +1,64 @@
 import React, { useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
+import { logger } from '../lib/logger';
 
 function OAuthCallback() {
   useEffect(() => {
-    async function handleOAuth() {
-      try {
-        const hashParams = new URLSearchParams(window.location.hash.substring(1));
-        if (hashParams.get('access_token')) {
-          // Wait for Supabase to restore session
-          setTimeout(async () => {
-            const userResult = await supabase.auth.getUser();
-            const { data: { user }, error: userError } = userResult;
-            if (userError) {
-              console.error('OAuthCallback: getUser() error', userError);
+    // Flag to prevent multiple checks
+    let mounted = true;
+
+    async function handleAuthChange(event, session) {
+        if (!mounted) return;
+        
+        if (session?.user) {
+            logger.log('Session restored:', session.user.id);
+            try {
+                 // Check if user is new by looking for their profile
+                const { data: profile, error } = await supabase
+                    .from('user_profiles')
+                    .select('id')
+                    .eq('user_id', session.user.id)
+                    .maybeSingle();
+
+                if (!mounted) return;
+
+                if (!profile) {
+                    window.location.href = '/resume-builder?new=true';
+                } else {
+                    window.location.href = '/';
+                }
+            } catch (err) {
+                logger.error('Profile check failed', err);
+                if (mounted) window.location.href = '/';
             }
-            if (user) {
-              // Check if user is new by looking for their profile
-              const { data: profile, error } = await supabase
-                .from('user_profiles')
-                .select('id')
-                .eq('user_id', user.id)
-                .single();
-              
-              if (!profile || error) {
-                window.location.href = '/resume-builder?new=true';
-              } else {
-                window.location.href = '/';
-              }
-            } else {
-              window.location.href = '/login';
-            }
-          }, 1000);
-        } else if (hashParams.get('error')) {
-          window.location.href = '/login?error=' + encodeURIComponent(hashParams.get('error_description') || 'Authentication failed');
-        } else {
-          setTimeout(() => {
-            window.location.href = '/';
-          }, 1000);
+        } else if (event === 'SIGNED_OUT') {
+             if (mounted) window.location.href = '/login';
         }
-      } catch (error) {
-        console.error('OAuthCallback: caught error', error);
-        window.location.href = '/login';
-      }
     }
-    handleOAuth();
+
+    // Set up auth listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthChange);
+
+    // Initial check in case state is already present
+    supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session) {
+            handleAuthChange('SIGNED_IN', session);
+        } else {
+             // If no session after a short grace period (for hash parsing), check hash manually or fail
+             // The onAuthStateChange usually catches the hash flow.
+             // If hash is present but no session yet, Supabase handles it.
+             // But if error in hash:
+             const hashParams = new URLSearchParams(window.location.hash.substring(1));
+             if (hashParams.get('error')) {
+                 window.location.href = '/login?error=' + encodeURIComponent(hashParams.get('error_description') || 'Authentication failed');
+             }
+        }
+    });
+
+    return () => {
+        mounted = false;
+        subscription.unsubscribe();
+    };
   }, []);
 
   return (

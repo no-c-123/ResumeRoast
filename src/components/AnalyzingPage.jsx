@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
+import { getFile, removeFile } from '../lib/storage';
+import { logger } from '../lib/logger';
 
 function AnalyzingPage() {
     const [currentStep, setCurrentStep] = useState(0);
@@ -74,43 +76,62 @@ function AnalyzingPage() {
 
     const analyzeResume = async () => {
         try {
-            // Get the uploaded file from sessionStorage
-            const fileData = sessionStorage.getItem('pendingAnalysis');
-            if (!fileData) {
+            // Get the uploaded file from IndexedDB
+            const metaData = sessionStorage.getItem('pendingAnalysisMeta');
+            
+            // Backward compatibility for existing sessionStorage
+            const oldFileData = sessionStorage.getItem('pendingAnalysis');
+            
+            let file, careerLevel;
+            
+            if (metaData) {
+                const meta = JSON.parse(metaData);
+                careerLevel = meta.careerLevel;
+                file = await getFile('pendingAnalysisFile');
+            } else if (oldFileData) {
+                 const data = JSON.parse(oldFileData);
+                 careerLevel = data.careerLevel;
+                 const byteCharacters = atob(data.fileContent);
+                 const byteNumbers = new Array(byteCharacters.length);
+                 for (let i = 0; i < byteCharacters.length; i++) {
+                     byteNumbers[i] = byteCharacters.charCodeAt(i);
+                 }
+                 const byteArray = new Uint8Array(byteNumbers);
+                 const blob = new Blob([byteArray]);
+                 file = new File([blob], data.fileName, { type: 'application/pdf' });
+            }
+
+            if (!file) {
                 window.location.href = '/';
                 return;
             }
 
-            const { fileName, fileContent, careerLevel } = JSON.parse(fileData);
-
             // Get current user session
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) {
-                sessionStorage.removeItem('pendingAnalysis');
+                // Cleanup
+                if (metaData) {
+                    await removeFile('pendingAnalysisFile');
+                    sessionStorage.removeItem('pendingAnalysisMeta');
+                } else {
+                    sessionStorage.removeItem('pendingAnalysis');
+                }
                 window.location.href = '/login';
                 return;
             }
-
-            // Convert base64 back to file
-            const byteCharacters = atob(fileContent);
-            const byteNumbers = new Array(byteCharacters.length);
-            for (let i = 0; i < byteCharacters.length; i++) {
-                byteNumbers[i] = byteCharacters.charCodeAt(i);
-            }
-            const byteArray = new Uint8Array(byteNumbers);
-            const blob = new Blob([byteArray]);
-            const file = new File([blob], fileName, { type: 'application/pdf' });
 
             // Create FormData for API request
             const formData = new FormData();
             formData.append('file', file);
             formData.append('userId', session.user.id);
-            formData.append('sessionToken', session.access_token);
             formData.append('careerLevel', careerLevel || 'professional');
 
             // Call the analysis API
             const response = await fetch('/api/analyze-resume', {
                 method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${session.access_token}`
+                },
                 body: formData
             });
 
@@ -126,14 +147,19 @@ function AnalyzingPage() {
                 throw new Error('No analysis ID returned from server');
             }
 
-            // Clean up sessionStorage
-            sessionStorage.removeItem('pendingAnalysis');
+            // Clean up storage
+            if (metaData) {
+                await removeFile('pendingAnalysisFile');
+                sessionStorage.removeItem('pendingAnalysisMeta');
+            } else {
+                sessionStorage.removeItem('pendingAnalysis');
+            }
 
             // Redirect to results page
             window.location.href = `/analysis/${analysisId}`;
 
         } catch (error) {
-            console.error('Analysis error:', error);
+            logger.error('Analysis error:', error);
             // Don't redirect immediately - show the error on the page
             setCurrentStep(-1); // Use -1 to indicate error state
             alert(`Failed to analyze resume: ${error.message}\n\nCheck the browser console and terminal for more details.`);

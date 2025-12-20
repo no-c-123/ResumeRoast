@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
+import { logger } from '../lib/logger';
 import { set } from 'astro:schema';
 import { occupations } from '../data/occupations';
 
@@ -124,7 +125,10 @@ function LoginForm() {
             });
 
             if (profileError) {
-                console.error('Profile creation error:', profileError.message);
+                // Ignore duplicate key error as it means profile already exists
+                if (profileError.code !== '23505') {
+                    logger.error('Profile creation error:', profileError.message);
+                }
             }
 
             if (data.session) {

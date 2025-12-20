@@ -1,6 +1,9 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
 import { parseResumeTextToStructuredData } from '../../lib/resumeParser.js';
+import { checkRateLimit } from '../../lib/rateLimit.js';
+import { checkSubscription } from '../../lib/entitlement.js';
+import { checkAiLimit, recordAiUsage } from '../../lib/subscriptionUtils.js';
 
 export const prerender = false;
 
@@ -50,6 +53,38 @@ export async function POST({ request }) {
                 error: 'Unauthorized'
             }), {
                 status: 401,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+
+        // Enforce Subscription OR Limit for Tailoring
+        const hasValidSubscription = await checkSubscription(user.id);
+        let isAllowed = hasValidSubscription;
+
+        if (!isAllowed) {
+            const limitCheck = await checkAiLimit(user.id);
+            if (limitCheck.canGenerate) {
+                isAllowed = true;
+                await recordAiUsage(user.id);
+            }
+        }
+
+        if (!isAllowed) {
+            return new Response(JSON.stringify({ 
+                error: 'You have reached your free limit for resume tailoring. Please upgrade to Pro for unlimited access.',
+                code: 'LIMIT_REACHED'
+            }), {
+                status: 403,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+
+        if (!checkRateLimit(user.id)) {
+            return new Response(JSON.stringify({
+                success: false,
+                error: 'Rate limit exceeded. Please try again later.'
+            }), {
+                status: 429,
                 headers: { 'Content-Type': 'application/json' }
             });
         }
@@ -161,8 +196,7 @@ Return the tailored resume in this exact JSON format:
         } catch (parseError) {
             console.error('Failed to parse AI response:', parseError);
             return new Response(JSON.stringify({ 
-                error: 'Failed to parse AI response',
-                rawResponse: message.content[0].text 
+                error: 'Our AI generated a response that we couldn\'t process. Please try again.'
             }), {
                 status: 500,
                 headers: { 'Content-Type': 'application/json' }
@@ -184,7 +218,7 @@ Return the tailored resume in this exact JSON format:
         console.error('Error tailoring resume:', error);
         return new Response(JSON.stringify({
             success: false,
-            error: error.message || 'Internal server error'
+            error: 'An unexpected error occurred while tailoring your resume. Please try again later.'
         }), {
             status: 500,
             headers: { 'Content-Type': 'application/json' }

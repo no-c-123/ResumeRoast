@@ -67,12 +67,12 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                     </div>
                 )}
 
-                {hasWorkExperience && workExperience && workExperience.length > 0 && workExperience[0].company && (
+                {hasWorkExperience && workExperience && workExperience.length > 0 && workExperience.some(exp => exp && exp.company) && (
                     <div className="mb-5">
                         <h2 className="text-lg font-bold mb-2 uppercase tracking-wide" style={{ color: accentColor }}>Work Experience</h2>
-                        {workExperience.map((exp) => (
-                            exp.company && (
-                                <div key={exp.id} className="mb-4">
+                        {workExperience.map((exp, index) => (
+                            exp && exp.company ? (
+                                <div key={exp.id || index} className="mb-4">
                                     <div className="flex justify-between items-baseline mb-1">
                                         <h3 className="font-bold text-base">{exp.position || 'Position'}</h3>
                                         <span className="text-sm text-neutral-600 whitespace-nowrap ml-4">
@@ -84,17 +84,17 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                                         <p className="text-sm text-neutral-800 leading-relaxed whitespace-pre-line">{exp.description}</p>
                                     )}
                                 </div>
-                            )
+                            ) : null
                         ))}
                     </div>
                 )}
 
-                {hasEducation && education && education.length > 0 && education[0].school && (
+                {hasEducation && education && education.length > 0 && education.some(edu => edu && edu.school) && (
                     <div className="mb-5">
                         <h2 className="text-lg font-bold mb-2 uppercase tracking-wide" style={{ color: accentColor }}>Education</h2>
-                        {education.map((edu) => (
-                            edu.school && (
-                                <div key={edu.id} className="mb-4">
+                        {education.map((edu, index) => (
+                            edu && edu.school ? (
+                                <div key={edu.id || index} className="mb-4">
                                     <div className="flex justify-between items-baseline mb-1">
                                         <h3 className="font-bold text-base">{edu.degree || 'Degree'}</h3>
                                         <span className="text-sm text-neutral-600 whitespace-nowrap ml-4">
@@ -106,7 +106,7 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                                         <p className="text-sm text-neutral-800">{edu.field}</p>
                                     )}
                                 </div>
-                            )
+                            ) : null
                         ))}
                     </div>
                 )}
@@ -166,9 +166,9 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                 {hasWorkExperience && workExperience && workExperience.length > 0 && workExperience[0].company && (
                     <div className="mb-6">
                         <h2 className="text-xl font-bold mb-3 pb-2 border-b-2" style={{ borderColor: accentColor }}>PROFESSIONAL EXPERIENCE</h2>
-                        {workExperience.map((exp) => (
+                        {workExperience.map((exp, index) => (
                             exp.company && (
-                                <div key={exp.id} className="mb-5">
+                                <div key={exp.id || index} className="mb-5">
                                     <div className="mb-2">
                                         <h3 className="font-bold text-lg" style={{ color: accentColor }}>{exp.position || 'Position'}</h3>
                                         <div className="text-sm text-neutral-700 font-medium">{exp.company}</div>
@@ -190,9 +190,9 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                 {hasEducation && education && education.length > 0 && education[0].school && (
                     <div className="mb-6">
                         <h2 className="text-xl font-bold mb-3 pb-2 border-b-2" style={{ borderColor: accentColor }}>EDUCATION</h2>
-                        {education.map((edu) => (
+                        {education.map((edu, index) => (
                             edu.school && (
-                                <div key={edu.id} className="mb-4">
+                                <div key={edu.id || index} className="mb-4">
                                     <h3 className="font-bold text-lg">{edu.degree || 'Degree'}</h3>
                                     <div className="text-sm text-neutral-700 font-medium">{edu.school}</div>
                                     <div className="text-sm text-neutral-600 italic">
@@ -303,9 +303,9 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                 {hasWorkExperience && workExperience && workExperience.length > 0 && workExperience[0].company && (
                     <div className="mb-5">
                         <h2 className="text-lg font-bold mb-2 tracking-wide" style={{ color: accentColor }}>PROFESSIONAL EXPERIENCE</h2>
-                        {workExperience.map((exp) => (
+                        {workExperience.map((exp, index) => (
                             exp.company && (
-                                <div key={exp.id} className="mb-4 pl-4 border-l-4" style={{ borderColor: accentColor }}>
+                                <div key={exp.id || index} className="mb-4 pl-4 border-l-4" style={{ borderColor: accentColor }}>
                                     <div className="font-bold text-base">{exp.position || 'Position'}</div>
                                     <div className="text-sm text-neutral-700 font-semibold">{exp.company}</div>
                                     <div className="text-sm text-neutral-600 mb-2">
@@ -325,9 +325,9 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                 {hasEducation && education && education.length > 0 && education[0].school && (
                     <div className="mb-5">
                         <h2 className="text-lg font-bold mb-2 tracking-wide" style={{ color: accentColor }}>EDUCATION</h2>
-                        {education.map((edu) => (
+                        {education.map((edu, index) => (
                             edu.school && (
-                                <div key={edu.id} className="mb-3">
+                                <div key={edu.id || index} className="mb-3">
                                     <div className="font-bold text-base">{edu.degree || 'Degree'}</div>
                                     <div className="text-sm text-neutral-700">{edu.school}</div>
                                     <div className="text-sm text-neutral-600">
@@ -373,9 +373,9 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                 {hasWorkExperience && workExperience && workExperience.length > 0 && workExperience[0].company && (
                     <div className="mb-5">
                         <h2 className="text-base font-bold mb-2 pb-1 border-b border-neutral-300">EXPERIENCE</h2>
-                        {workExperience.map((exp) => (
+                        {workExperience.map((exp, index) => (
                             exp.company && (
-                                <div key={exp.id} className="mb-4">
+                                <div key={exp.id || index} className="mb-4">
                                     <div className="flex justify-between items-baseline">
                                         <h3 className="font-bold text-base">{exp.position || 'Position'}</h3>
                                         <span className="text-sm text-neutral-600">
@@ -395,9 +395,9 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                 {hasEducation && education && education.length > 0 && education[0].school && (
                     <div className="mb-5">
                         <h2 className="text-base font-bold mb-2 pb-1 border-b border-neutral-300">EDUCATION</h2>
-                        {education.map((edu) => (
+                        {education.map((edu, index) => (
                             edu.school && (
-                                <div key={edu.id} className="mb-3">
+                                <div key={edu.id || index} className="mb-3">
                                     <div className="flex justify-between items-baseline">
                                         <h3 className="font-bold text-base">{edu.degree || 'Degree'}</h3>
                                         <span className="text-sm text-neutral-600">
@@ -468,9 +468,9 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                 {hasWorkExperience && workExperience && workExperience.length > 0 && workExperience[0].company && (
                     <div className="mb-6">
                         <h2 className="text-xs font-bold mb-3 uppercase tracking-widest text-neutral-500">Experience</h2>
-                        {workExperience.map((exp) => (
+                        {workExperience.map((exp, index) => (
                             exp.company && (
-                                <div key={exp.id} className="mb-5">
+                                <div key={exp.id || index} className="mb-5">
                                     <div className="flex justify-between items-baseline mb-1">
                                         <h3 className="font-semibold text-base">{exp.position || 'Position'}</h3>
                                         <span className="text-xs text-neutral-500">
@@ -490,9 +490,9 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                 {hasEducation && education && education.length > 0 && education[0].school && (
                     <div className="mb-6">
                         <h2 className="text-xs font-bold mb-3 uppercase tracking-widest text-neutral-500">Education</h2>
-                        {education.map((edu) => (
+                        {education.map((edu, index) => (
                             edu.school && (
-                                <div key={edu.id} className="mb-4">
+                                <div key={edu.id || index} className="mb-4">
                                     <div className="flex justify-between items-baseline mb-1">
                                         <h3 className="font-semibold text-base">{edu.degree || 'Degree'}</h3>
                                         <span className="text-xs text-neutral-500">
@@ -564,9 +564,9 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                 {hasWorkExperience && workExperience && workExperience.length > 0 && workExperience[0].company && (
                     <div className="mb-6">
                         <h2 className="text-lg font-bold mb-3" style={{ color: accentColor }}>Professional Experience</h2>
-                        {workExperience.map((exp) => (
+                        {workExperience.map((exp, index) => (
                             exp.company && (
-                                <div key={exp.id} className="mb-5">
+                                <div key={exp.id || index} className="mb-5">
                                     <div className="mb-2">
                                         <div className="flex justify-between items-baseline">
                                             <h3 className="font-bold text-base">{exp.position || 'Position'}</h3>
@@ -588,9 +588,9 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                 {hasEducation && education && education.length > 0 && education[0].school && (
                     <div className="mb-6">
                         <h2 className="text-lg font-bold mb-3" style={{ color: accentColor }}>Education</h2>
-                        {education.map((edu) => (
+                        {education.map((edu, index) => (
                             edu.school && (
-                                <div key={edu.id} className="mb-4">
+                                <div key={edu.id || index} className="mb-4">
                                     <div className="flex justify-between items-baseline">
                                         <h3 className="font-bold text-base">{edu.degree || 'Degree'}</h3>
                                         <span className="text-sm text-neutral-600 italic">

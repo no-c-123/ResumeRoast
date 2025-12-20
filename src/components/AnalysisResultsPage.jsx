@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { jsPDF } from 'jspdf';
-import { checkDownloadLimit, recordDownload } from '../lib/subscriptionUtils';
+import { checkDownloadLimit, recordDownload, checkAiLimit } from '../lib/subscriptionUtils';
 import { parseResumeTextToStructuredData } from '../lib/resumeParser';
+import { logger } from '../lib/logger';
+import UpgradeModal from './UpgradeModal';
 
 function AnalysisResultsPage({ analysisId }) {
     const [analysis, setAnalysis] = useState(null);
@@ -11,6 +13,9 @@ function AnalysisResultsPage({ analysisId }) {
     const [expandedSection, setExpandedSection] = useState(null);
     const [activeTab, setActiveTab] = useState('analysis');
     const [isPremium, setIsPremium] = useState(false);
+    const [aiLimit, setAiLimit] = useState(null);
+    const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+    const [upgradeFeatureName, setUpgradeFeatureName] = useState('');
     const [jobDescription, setJobDescription] = useState('');
     const [tailoring, setTailoring] = useState(false);
     const [tailoredResult, setTailoredResult] = useState(null);
@@ -28,6 +33,24 @@ function AnalysisResultsPage({ analysisId }) {
         fetchUserProfile();
     }, [analysisId]);
 
+    useEffect(() => {
+        if (analysisId) {
+            fetchAiLimit();
+        }
+    }, [analysisId, isPremium]); // Re-fetch limit when premium status changes or analysisId changes
+
+    const fetchAiLimit = async () => {
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+                const limit = await checkAiLimit(session.user.id);
+                setAiLimit(limit);
+            }
+        } catch (err) {
+            logger.error('Error fetching AI limit:', err);
+        }
+    };
+
     const fetchUserProfile = async () => {
         try {
             const { data: { session } } = await supabase.auth.getSession();
@@ -43,7 +66,7 @@ function AnalysisResultsPage({ analysisId }) {
                 setUserProfile(data);
             }
         } catch (err) {
-            console.log('Error fetching user profile:', err);
+            logger.error('Error fetching user profile:', err);
         }
     };
 
@@ -65,7 +88,7 @@ function AnalysisResultsPage({ analysisId }) {
             if (error) throw error;
             setAnalysis(data);
         } catch (err) {
-            console.error('Error fetching analysis:', err);
+            logger.error('Error fetching analysis:', err);
             setError('Failed to load analysis');
         } finally {
             setLoading(false);
@@ -85,14 +108,14 @@ function AnalysisResultsPage({ analysisId }) {
                 .maybeSingle();
 
             if (error) {
-                console.log('Error checking subscription:', error);
+                logger.error('Error checking subscription:', error);
                 setIsPremium(false);
                 return;
             }
 
             setIsPremium(!!data);
         } catch (err) {
-            console.log('No premium subscription found:', err);
+            logger.error('No premium subscription found:', err);
             setIsPremium(false);
         }
     };
@@ -132,10 +155,10 @@ function AnalysisResultsPage({ analysisId }) {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`
                 },
                 body: JSON.stringify({
                     userId: session.user.id,
-                    sessionToken: session.access_token,
                     resumeText: analysis.analysis_text,
                     resumeData: structuredData, // Send structured data
                     analysisId: analysis.id
@@ -151,6 +174,11 @@ function AnalysisResultsPage({ analysisId }) {
             const improvedData = result.improved_resume;
             setImprovedResume(improvedData);
             
+            // Update local limit
+            if (!isPremium && aiLimit) {
+                setAiLimit(prev => ({ ...prev, generationsRemaining: Math.max(0, prev.generationsRemaining - 1) }));
+            }
+            
             if (result.changes_made) {
                 if (Array.isArray(result.changes_made)) {
                     setImprovementNotes(result.changes_made.join('\n'));
@@ -163,7 +191,7 @@ function AnalysisResultsPage({ analysisId }) {
                 setImprovementNotes('Resume improved successfully!');
             }
         } catch (err) {
-            console.error('Error improving resume:', err);
+            logger.error('Error improving resume:', err);
             alert('Error improving resume: ' + err.message);
         } finally {
             setIsImproving(false);
@@ -228,7 +256,7 @@ function AnalysisResultsPage({ analysisId }) {
             
             window.location.href = '/resume-builder?tailored=true';
         } catch (err) {
-            console.error('Error tailoring resume:', err);
+            logger.error('Error tailoring resume:', err);
             alert('Error tailoring resume: ' + err.message);
         } finally {
             setTailoring(false);
@@ -417,7 +445,7 @@ function AnalysisResultsPage({ analysisId }) {
             pdf.save(fileName);
             
         } catch (err) {
-            console.error('Error downloading tailored resume:', err);
+            logger.error('Error downloading tailored resume:', err);
             alert('Error downloading tailored resume. Please try again.');
         } finally {
             setDownloadingTailored(false);
@@ -490,8 +518,9 @@ function AnalysisResultsPage({ analysisId }) {
                     </button>
                     <button
                         onClick={() => {
-                            if (!isPremium) {
-                                window.location.href = '/pricing';
+                            if (!isPremium && aiLimit && !aiLimit.canGenerate) {
+                                setUpgradeFeatureName('Tailor for Job');
+                                setShowUpgradeModal(true);
                             } else {
                                 setActiveTab('tailor');
                             }
@@ -504,7 +533,7 @@ function AnalysisResultsPage({ analysisId }) {
                     >
                         Tailor for Job
                         {!isPremium && (
-                            <span className="px-2 py-0.5 text-xs bg-gradient-to-r from-orange-500 to-red-500 rounded-full">
+                            <span className="text-white text-[10px] font-bold px-1.5 py-0.5 rounded-2xl [background:linear-gradient(#0c0c0e,#0c0c0e)_padding-box,conic-gradient(from_var(--border-angle),theme(colors.orange.600)_80%,_theme(colors.orange.500)_86%,_theme(colors.orange.300)_90%,_theme(colors.orange.500)_94%,_theme(colors.orange.600))_border-box] border-[3px] border-transparent [animation:border_4s_linear_infinite]">
                                 Premium
                             </span>
                         )}
@@ -513,6 +542,13 @@ function AnalysisResultsPage({ analysisId }) {
                         )}
                     </button>
                 </div>
+
+                <UpgradeModal 
+                    isOpen={showUpgradeModal} 
+                    onClose={() => setShowUpgradeModal(false)}
+                    featureName={upgradeFeatureName}
+                    remainingRequests={aiLimit?.generationsRemaining}
+                />
 
                 {/* Analysis Tab Content */}
                 {activeTab === 'analysis' && (
@@ -715,10 +751,24 @@ function AnalysisResultsPage({ analysisId }) {
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                     {!improvedResume && (
                         <button 
-                            onClick={handleImproveWithAI}
+                            onClick={() => {
+                                if (!isPremium && aiLimit && aiLimit.generationsRemaining <= 0) {
+                                    setUpgradeFeatureName('AI Resume Improvement');
+                                    setShowUpgradeModal(true);
+                                    return;
+                                }
+                                handleImproveWithAI();
+                            }}
                             disabled={isImproving}
-                            className="px-8 py-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:from-neutral-700 disabled:to-neutral-600 rounded-xl font-semibold text-lg transition-all flex items-center justify-center gap-2"
+                            className="px-8 py-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:from-neutral-700 disabled:to-neutral-600 rounded-xl font-semibold text-lg transition-all flex items-center justify-center gap-2 relative"
                         >
+                            {!isPremium && (
+                                <div className="absolute top-[-15px] right-[-15px] ">
+                                    <span className="text-white text-[10px] font-bold px-1.5 py-0.5 rounded-2xl [background:linear-gradient(#0c0c0e,#0c0c0e)_padding-box,conic-gradient(from_var(--border-angle),theme(colors.orange.600)_80%,_theme(colors.orange.500)_86%,_theme(colors.orange.300)_90%,_theme(colors.orange.500)_94%,_theme(colors.orange.600))_border-box] border-[3px] border-transparent [animation:border_4s_linear_infinite]">
+                                        {aiLimit && aiLimit.generationsRemaining > 0 ? `${aiLimit.generationsRemaining} left` : 'PRO'}
+                                    </span>
+                                </div>
+                            )}
                             {isImproving ? (
                                 <>
                                     <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

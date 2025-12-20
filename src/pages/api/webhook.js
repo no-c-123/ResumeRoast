@@ -17,7 +17,10 @@ export const POST = async ({ request }) => {
       );
     } catch (err) {
       console.log(`⚠️  Webhook signature verification failed.`, err.message);
-      return new Response('Webhook signature verification failed', { status: 400 });
+      return new Response(JSON.stringify({ error: 'Webhook signature verification failed' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
   } else {
     // Fallback for development without signature verification (NOT RECOMMENDED for production)
@@ -27,7 +30,10 @@ export const POST = async ({ request }) => {
     try {
        event = JSON.parse(body);
     } catch (e) {
-       return new Response('Invalid JSON', { status: 400 });
+       return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+       });
     }
   }
 

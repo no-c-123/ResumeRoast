@@ -1,4 +1,5 @@
 import { stripe } from '../../lib/stripe';
+import { createClient } from '@supabase/supabase-js';
 
 export const POST = async ({ request }) => {
   try {
@@ -6,6 +7,30 @@ export const POST = async ({ request }) => {
     let priceId = body.price_id;
     let mode = body.mode || 'subscription';
     const userId = body.user_id;
+
+    // Verify user if userId is provided
+    if (userId) {
+        const authHeader = request.headers.get('authorization');
+        if (!authHeader) {
+             return new Response(JSON.stringify({ error: 'Authentication required' }), { 
+                 status: 401,
+                 headers: { 'Content-Type': 'application/json' }
+             });
+        }
+        const token = authHeader.replace('Bearer ', '');
+        const supabase = createClient(
+            import.meta.env.PUBLIC_SUPABASE_URL, 
+            import.meta.env.PUBLIC_SUPABASE_ANON_KEY
+        );
+        const { data: { user }, error } = await supabase.auth.getUser(token);
+        
+        if (error || !user || user.id !== userId) {
+             return new Response(JSON.stringify({ error: 'Unauthorized request' }), { 
+                 status: 403,
+                 headers: { 'Content-Type': 'application/json' }
+             });
+        }
+    }
     
     const origin = new URL(request.url).origin;
     const YOUR_DOMAIN = import.meta.env.FRONTEND_URL || origin;

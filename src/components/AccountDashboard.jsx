@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabaseClient';
+import { logger } from '../lib/logger';
 import Loader from './uicomponents/Loader.jsx';
 import AnalysisResults from './AnalysisResults.jsx';
 
@@ -34,7 +35,7 @@ function AccountDashborad() {
             await supabase.auth.signOut();
             window.location.href = '/';
         } catch (error) {
-            console.error('Error logging out:', error);
+            logger.error('Error logging out:', error);
         }
     };
 
@@ -63,7 +64,7 @@ function AccountDashborad() {
             await supabase.auth.signOut();
             window.location.href = '/';
         } catch (error) {
-            console.error('Error deleting account:', error);
+            logger.error('Error deleting account:', error);
             setError(error.message || 'Failed to delete account');
             setIsLoading(false);
         }
@@ -102,10 +103,12 @@ function AccountDashborad() {
             const formData = new FormData();
             formData.append('file', file);
             formData.append('userId', session.user.id);
-            formData.append('sessionToken', session.access_token);
 
             const response = await fetch('/api/analyze-resume', {
                 method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${session.access_token}`
+                },
                 body: formData
             });
 
@@ -120,7 +123,7 @@ function AccountDashborad() {
             await fetchRecentAnalyses(); // Refresh history
 
         } catch (err) {
-            console.error('Analysis error:', err);
+            logger.error('Analysis error:', err);
             setError(err.message || 'Failed to analyze resume. Please try again.');
         } finally {
             setIsLoading(false);
@@ -151,7 +154,7 @@ function AccountDashborad() {
                 setStats({ total: 0, avgScore: 0, lastAnalysis: null });
             }
         } catch (err) {
-            console.error('Error fetching analyses:', err);
+            logger.error('Error fetching analyses:', err);
         }
     };
 
@@ -168,7 +171,7 @@ function AccountDashborad() {
             if (error) throw error;
             setSubscription(data);
         } catch (err) {
-            console.error('Error fetching subscription:', err);
+            logger.error('Error fetching subscription:', err);
         }
     };
 

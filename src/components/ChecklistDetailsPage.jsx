@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
+import { logger } from '../lib/logger';
 
 function ChecklistDetailsPage({ analysisId }) {
     const [analysis, setAnalysis] = useState(null);
@@ -27,7 +28,7 @@ function ChecklistDetailsPage({ analysisId }) {
             if (error) throw error;
             setAnalysis(data);
         } catch (err) {
-            console.error('Error fetching analysis:', err);
+            logger.error('Error fetching analysis:', err);
         } finally {
             setLoading(false);
         }
