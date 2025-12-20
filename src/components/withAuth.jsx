@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabaseClient';
+import { authService } from '../services/supabase';
+import { logger } from '../lib/logger';
 import Loader from './uicomponents/Loader.jsx';
 
 export function withAuth(WrappedComponent) {
@@ -10,14 +11,14 @@ export function withAuth(WrappedComponent) {
     useEffect(() => {
       const checkAuth = async () => {
         try {
-          const { data: { session } } = await supabase.auth.getSession();
+          const session = await authService.getSession();
           if (!session) {
             window.location.href = '/login';
           } else {
             setAuthenticated(true);
           }
         } catch (error) {
-          console.error('Auth check failed:', error);
+          logger.error('Auth check failed:', error);
           window.location.href = '/login';
         } finally {
           setLoading(false);

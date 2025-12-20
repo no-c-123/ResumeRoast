@@ -3,7 +3,9 @@ import { createClient } from '@supabase/supabase-js';
 import { parseResumeTextToStructuredData } from '../../lib/resumeParser.js';
 import { checkRateLimit } from '../../lib/rateLimit.js';
 import { checkSubscription } from '../../lib/entitlement.js';
-import { checkAiLimit, recordAiUsage } from '../../lib/subscriptionUtils.js';
+import { checkAiLimit, recordAiUsage } from '../../lib/server/subscriptionUtils.js';
+import { logger } from '../../lib/logger.js';
+import { ImproveSchema } from '../../lib/schemas';
 
 export const prerender = false;
 
@@ -27,14 +29,14 @@ export async function POST({ request }) {
     }
     const sessionToken = authHeader.replace('Bearer ', '');
 
-    const { userId, resumeData, analysisId, resumeText } = await request.json();
+    const rawBody = await request.json();
+    const result = ImproveSchema.safeParse(rawBody);
 
-    if (!userId) {
-      return new Response(JSON.stringify({ error: 'Missing required fields' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
+    if (!result.success) {
+      return new Response(JSON.stringify({ error: 'Invalid input', details: result.error.format() }), { status: 400 });
     }
+
+    const { userId, resumeText, resumeData, analysisId } = result.data;
 
     if (!checkRateLimit(userId)) {
       return new Response(JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }), {
@@ -203,7 +205,7 @@ Return the improved resume in this exact JSON format:
       const cleanJson = jsonMatch ? jsonMatch[1] : responseText;
       improvedResume = JSON.parse(cleanJson);
     } catch (parseError) {
-      console.error('Failed to parse AI response:', parseError);
+      logger.error('Failed to parse AI response:', parseError);
       return new Response(JSON.stringify({ 
         error: 'Our AI generated a response that we couldn\'t process. Please try again.',
         // Don't expose raw response in production, maybe log it
@@ -224,7 +226,7 @@ Return the improved resume in this exact JSON format:
     });
 
   } catch (error) {
-    console.error('Error improving resume:', error);
+    logger.error('Error improving resume:', error);
     return new Response(JSON.stringify({ 
       error: 'An unexpected error occurred while improving your resume. Please try again later.' 
     }), {

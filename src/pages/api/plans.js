@@ -1,46 +1,70 @@
-export const plans = [
-  {
-    key: 'pro',
-    name: 'Pro Plan',
-    price: '$19.00',
-    priceDetail: '/ month',
-    lookup_key: 'Pro_plan-0d04ed9',
-    // price_id can be fetched via lookup_key or hardcoded if necessary, 
-    // but better to rely on lookup_key or server resolution
-    features: [
-      '✔️ Unlimited resume analyses',
-      '✔️ Premium templates',
-      '✔️ Priority support',
-      '✔️ Cancel anytime',
-    ],
-    icon: '/proplanIcon.png',
-    button: 'Upgrade to Pro',
-    gradient: 'from-orange-400 via-orange-500 to-red-500',
-    mode: 'subscription'
-  },
-  {
-    key: 'lifetime',
-    name: 'Lifetime Plan',
-    price: '$149',
-    priceDetail: 'one time',
-    lookup_key: 'Lifetime_plan-0d04ed91',
-    price_id: 'price_1SfadPCg8wVUWA0gLWYY3HPb',
-    features: [
-      '✔️ Unlimited resume analyses',
-      '✔️ Premium templates',
-      '✔️ Priority support',
-      '✔️ Pay once, own it forever',
-    ],
-    icon: '/OneTimePaymentIcon.png',
-    button: 'Buy Lifetime Access',
-    gradient: 'from-orange-400 via-orange-500 to-yellow-400',
-    mode: 'payment'
-  },
-];
+import { SERVER_PLANS } from '../../config/plans';
 
-export async function GET({ request }) {
-  return new Response(JSON.stringify(plans), {
+export const GET = async ({ request }) => {
+  // Publicly exposed plan details (no internal IDs)
+  const publicPlans = [
+    {
+      key: 'free',
+      name: 'Free',
+      price: '$0',
+      priceDetail: '',
+      features: [
+        'Basic AI resume roast',
+        'Limited roast report access',
+        '1 basic feedback download',
+        'Standard ATS compatibility'
+      ],
+      icon: '',
+      button: 'Try Now',
+      gradient: '',
+      mode: 'free',
+      popular: false
+    },
+    {
+      key: 'pro',
+      name: 'Pro',
+      price: '$19',
+      priceDetail: '/mo',
+      features: [
+        'Detailed AI fixes & suggestions',
+        'Unlimited roast report access',
+        'Unlimited advanced feedback downloads',
+        'Advanced keyword optimization',
+        'Priority ATS compatibility check',
+        'Priority customer support'
+      ],
+      icon: '/proplanIcon.png',
+      button: 'Upgrade to Pro',
+      gradient: 'from-orange-400 via-orange-500 to-red-500',
+      mode: 'subscription',
+      popular: true
+    },
+    {
+      key: 'lifetime',
+      name: 'Lifetime',
+      price: '$149',
+      priceDetail: ' once',
+      features: [
+        'Detailed AI fixes & suggestions',
+        'Unlimited roast report access',
+        'Unlimited advanced feedback downloads',
+        'Advanced keyword optimization',
+        'Priority ATS compatibility check',
+        'Priority customer support',
+        'Pay once, own it forever'
+      ],
+      icon: '/OneTimePaymentIcon.png',
+      button: 'Buy Lifetime Access',
+      gradient: 'from-orange-400 via-orange-500 to-yellow-400',
+      mode: 'payment',
+      popular: false
+    }
+  ];
+
+  return new Response(JSON.stringify(publicPlans), {
     status: 200,
-    headers: { 'Content-Type': 'application/json' }
+    headers: {
+      'Content-Type': 'application/json'
+    }
   });
 }

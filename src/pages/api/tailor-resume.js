@@ -3,7 +3,9 @@ import { createClient } from '@supabase/supabase-js';
 import { parseResumeTextToStructuredData } from '../../lib/resumeParser.js';
 import { checkRateLimit } from '../../lib/rateLimit.js';
 import { checkSubscription } from '../../lib/entitlement.js';
-import { checkAiLimit, recordAiUsage } from '../../lib/subscriptionUtils.js';
+import { checkAiLimit, recordAiUsage } from '../../lib/server/subscriptionUtils.js';
+import { logger } from '../../lib/logger.js';
+import { TailorSchema } from '../../lib/schemas';
 
 export const prerender = false;
 
@@ -19,19 +21,28 @@ const supabase = createClient(
 export async function POST({ request }) {
     try {
         const formData = await request.formData();
-        const resumeText = formData.get('resumeText');
-        const jobDescription = formData.get('jobDescription');
-        const originalSuggestions = JSON.parse(formData.get('originalSuggestions') || '{}');
+        
+        // Zod validation
+        const rawData = {
+            resumeText: formData.get('resumeText'),
+            jobDescription: formData.get('jobDescription'),
+            originalSuggestions: JSON.parse(formData.get('originalSuggestions') || '{}'),
+        };
 
-        if (!resumeText || !jobDescription) {
+        const validation = TailorSchema.safeParse(rawData);
+
+        if (!validation.success) {
             return new Response(JSON.stringify({
                 success: false,
-                error: 'Resume text and job description are required'
+                error: 'Invalid input',
+                details: validation.error.format()
             }), {
                 status: 400,
                 headers: { 'Content-Type': 'application/json' }
             });
         }
+
+        const { resumeText, jobDescription } = validation.data;
 
         const authHeader = request.headers.get('Authorization');
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -194,7 +205,7 @@ Return the tailored resume in this exact JSON format:
             const cleanJson = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : responseText;
             tailoredResume = JSON.parse(cleanJson);
         } catch (parseError) {
-            console.error('Failed to parse AI response:', parseError);
+            logger.error('Failed to parse AI response:', parseError);
             return new Response(JSON.stringify({ 
                 error: 'Our AI generated a response that we couldn\'t process. Please try again.'
             }), {
@@ -215,7 +226,7 @@ Return the tailored resume in this exact JSON format:
         });
 
     } catch (error) {
-        console.error('Error tailoring resume:', error);
+        logger.error('Error tailoring resume:', error);
         return new Response(JSON.stringify({
             success: false,
             error: 'An unexpected error occurred while tailoring your resume. Please try again later.'

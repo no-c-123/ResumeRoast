@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabaseClient';
+import { authService, dbService } from '../services/supabase';
 import { logger } from '../lib/logger';
 
 function ChecklistDetailsPage({ analysisId }) {
@@ -12,20 +12,13 @@ function ChecklistDetailsPage({ analysisId }) {
 
     const fetchAnalysis = async () => {
         try {
-            const { data: { session } } = await supabase.auth.getSession();
+            const session = await authService.getSession();
             if (!session) {
                 window.location.href = '/login';
                 return;
             }
 
-            const { data, error } = await supabase
-                .from('resume_analyses')
-                .select('*')
-                .eq('id', analysisId)
-                .eq('user_id', session.user.id)
-                .single();
-
-            if (error) throw error;
+            const data = await dbService.getAnalysis(analysisId, session.user.id);
             setAnalysis(data);
         } catch (err) {
             logger.error('Error fetching analysis:', err);

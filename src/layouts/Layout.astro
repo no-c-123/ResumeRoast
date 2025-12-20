@@ -3,6 +3,9 @@ import '../styles/global.css';
 import { ViewTransitions } from 'astro:transitions';
 import NavBar from '../components/NavBar.jsx';
 import Footer from '../components/Footer.astro';
+import ToastContainer from '../components/uicomponents/ToastContainer.jsx';
+import { AuthProvider } from '../contexts/AuthContext';
+import ErrorBoundary from '../components/ErrorBoundary';
 ---
 
 <!doctype html>
@@ -15,14 +18,19 @@ import Footer from '../components/Footer.astro';
 		<title>Resume Roast</title>
 	</head>
 	<body>
-		<div style="view-transition-name: navbar;">
-			<NavBar client:load/>
-		</div>
-		<ViewTransitions />
-			<slot/>
-		<div style="view-transition-name: footer;">
-			<Footer />
-		</div>
+        <ErrorBoundary client:load>
+            <AuthProvider client:load>
+                <div style="view-transition-name: navbar;">
+                    <NavBar client:load/>
+                </div>
+                <ToastContainer client:load transition:persist />
+                <ViewTransitions />
+                <slot/>
+                <div style="view-transition-name: footer;">
+                    <Footer />
+                </div>
+            </AuthProvider>
+        </ErrorBoundary>
 	</body>
 	
 </html>

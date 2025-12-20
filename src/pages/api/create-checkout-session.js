@@ -1,11 +1,41 @@
 import { stripe } from '../../lib/stripe';
 import { createClient } from '@supabase/supabase-js';
+import { logger } from '../../lib/logger';
+import { SERVER_PLANS } from '../../config/plans';
+import { CheckoutSchema } from '../../lib/schemas';
 
 export const POST = async ({ request }) => {
   try {
-    const body = await request.json();
-    let priceId = body.price_id;
+    const rawBody = await request.json();
+    const result = CheckoutSchema.safeParse(rawBody);
+
+    if (!result.success) {
+      return new Response(JSON.stringify({ error: 'Invalid input', details: result.error.format() }), { status: 400 });
+    }
+
+    const body = result.data;
+    const planKey = body.planKey; 
+    
+    // Look up price_id or lookup_key from server config
+    let priceId = null;
+    let lookupKey = null;
     let mode = body.mode || 'subscription';
+
+    if (planKey && SERVER_PLANS[planKey]) {
+        const planConfig = SERVER_PLANS[planKey];
+        priceId = planConfig.price_id;
+        lookupKey = planConfig.lookup_key;
+        
+        // Auto-detect mode if not provided, based on plan key
+        if (!body.mode) {
+            mode = planKey === 'lifetime' ? 'payment' : 'subscription';
+        }
+    } else {
+        // Fallback for legacy calls (if any)
+        priceId = body.price_id;
+        lookupKey = body.lookup_key;
+    }
+
     const userId = body.user_id;
 
     // Verify user if userId is provided
@@ -57,9 +87,9 @@ export const POST = async ({ request }) => {
     if (mode === 'subscription') {
       sessionParams.subscription_data = { trial_period_days: 7 };
     }
-    if (!priceId && body.lookup_key) {
+    if (!priceId && lookupKey) {
       const prices = await stripe.prices.list({
-        lookup_keys: [body.lookup_key],
+        lookup_keys: [lookupKey],
         expand: ['data.product'],
       });
       if (!prices.data.length) {
@@ -80,7 +110,7 @@ export const POST = async ({ request }) => {
       }
     });
   } catch (err) {
-    console.error('Stripe checkout error:', err);
+    logger.error('Stripe checkout error:', err);
     return new Response(JSON.stringify({ error: 'Internal server error', details: err.message }), { status: 500 });
   }
 }

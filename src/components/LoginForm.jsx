@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabaseClient';
+import { authService, dbService } from '../services/supabase';
 import { logger } from '../lib/logger';
-import { set } from 'astro:schema';
 import { occupations } from '../data/occupations';
 
 function LoginForm() {
         // Redirect if already logged in (prevents OAuth login loop)
         useEffect(() => {
             const checkSession = async () => {
-                const { data: { session } } = await supabase.auth.getSession();
+                const session = await authService.getSession();
                 if (session && session.user) {
                     window.location.href = '/dashboard';
                 }
@@ -44,7 +43,7 @@ function LoginForm() {
         e.preventDefault();
         setErrorMessage('');
 
-        const { data, error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await authService.signInWithPassword({
             email,
             password,
         })
@@ -57,16 +56,17 @@ function LoginForm() {
 
         if (data.user) {
             // Check if user has a profile to determine if it's their first time
-            const { data: profile } = await supabase
-                .from('user_profiles')
-                .select('id')
-                .eq('user_id', data.user.id)
-                .single();
+            try {
+                const profile = await dbService.getProfile(data.user.id);
 
-            if (profile) {
-                window.location.href = '/';
-            } else {
-                window.location.href = '/resume-builder?new=true';
+                if (profile) {
+                    window.location.href = '/';
+                } else {
+                    window.location.href = '/resume-builder?new=true';
+                }
+            } catch (err) {
+                 logger.error('Error fetching profile on login:', err);
+                 window.location.href = '/'; // Fallback
             }
         } else {
             window.location.href = '/verify-email';
@@ -78,7 +78,7 @@ function LoginForm() {
         setErrorMessage('');
         setIsLoading(true);
 
-        const { error } = await supabase.auth.signInWithOAuth({
+        const { error } = await authService.signInWithOAuth({
             provider: provider,
             options: {
                 redirectTo: `${window.location.origin}/auth/callback`
@@ -102,7 +102,7 @@ function LoginForm() {
             return;
         }
 
-        const { data, error } = await supabase.auth.signUp({
+        const { data, error } = await authService.signUp({
             email,
             password,
             options: {
@@ -118,13 +118,15 @@ function LoginForm() {
         }
 
         if (data.user) {
-            const { error: profileError } = await supabase.from('user_profiles').insert({
-                user_id: data.user.id,
-                full_name: `${name.trim()} ${lastname.trim()}`,
-                email: email,
-            });
-
-            if (profileError) {
+            try {
+                // We use supabase client directly in dbService for this insert if upsertProfile handles it?
+                // upsertProfile handles inserts too.
+                await dbService.upsertProfile({
+                    user_id: data.user.id,
+                    full_name: `${name.trim()} ${lastname.trim()}`,
+                    email: email,
+                });
+            } catch (profileError) {
                 // Ignore duplicate key error as it means profile already exists
                 if (profileError.code !== '23505') {
                     logger.error('Profile creation error:', profileError.message);

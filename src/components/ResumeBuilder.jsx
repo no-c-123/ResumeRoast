@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
-import { supabase } from '../lib/supabaseClient';
+import { useAuth } from '../contexts/AuthContext';
+import { authService, dbService } from '../services/supabase';
 import { renderTemplate } from './ResumeTemplates.jsx';
 import { checkDownloadLimit, recordDownload, checkAiLimit } from '../lib/subscriptionUtils';
 import UpgradeModal from './UpgradeModal.jsx';
@@ -9,6 +10,7 @@ import Loader from './uicomponents/Loader.jsx';
 import { logger } from '../lib/logger';
 
 function ResumeBuilder() {
+    const { user, profile: contextProfile } = useAuth();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [showPreview, setShowPreview] = useState(false);
@@ -142,14 +144,13 @@ function ResumeBuilder() {
 
     useEffect(() => {
         const fetchLimits = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session) {
-                 const limit = await checkAiLimit(session.user.id);
+            if (user) {
+                 const limit = await checkAiLimit(user.id);
                  setAiLimit(limit);
             }
         };
         fetchLimits();
-    }, []);
+    }, [user]);
 
     // Helper to check if a value is a placeholder from AI
     const isPlaceholder = (value) => {
@@ -168,9 +169,9 @@ function ResumeBuilder() {
 
     const fetchProfile = async () => {
         try {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) {
-                window.location.href = '/login';
+            if (!user) {
+                // If checking user takes time, we might want to wait or just return.
+                // But loading state handles it.
                 return;
             }
 
@@ -215,17 +216,9 @@ function ResumeBuilder() {
 
             const dataToUse = improvedData || tailoredData;
 
-            const { data, error } = await supabase
-                .from('user_profiles')
-                .select('*')
-                .eq('user_id', session.user.id)
-                .single();
-
-            const { data: subscription } = await supabase
-                .from('user_subscriptions')
-                .select('*')
-                .eq('user_id', session.user.id)
-                .maybeSingle();
+            // Use contextProfile if available, or fetch
+            const data = contextProfile || await dbService.getProfile(user.id);
+            const subscription = await dbService.getSubscription(user.id);
             
             setIsPremium(subscription?.plan === 'pro' || subscription?.plan === 'premium');
 
@@ -234,7 +227,7 @@ function ResumeBuilder() {
                     full_name: getCleanValue(dataToUse.profile?.full_name, data?.full_name),
                     location: getCleanValue(dataToUse.profile?.location, data?.location),
                     phone: getCleanValue(dataToUse.profile?.phone, data?.phone),
-                    email: getCleanValue(dataToUse.profile?.email, data?.email || session.user.email),
+                    email: getCleanValue(dataToUse.profile?.email, data?.email || user.email),
                     linkedin: getCleanValue(dataToUse.profile?.linkedin, data?.linkedin),
                     professional_summary: getCleanValue(dataToUse.profile?.professional_summary, data?.professional_summary),
                     skills: getCleanValue(dataToUse.profile?.skills, data?.skills),
@@ -292,7 +285,7 @@ function ResumeBuilder() {
                     full_name: data.full_name || '',
                     location: data.location || '',
                     phone: data.phone || '',
-                    email: data.email || session.user.email || '',
+                    email: data.email || user.email || '',
                     linkedin: data.linkedin || '',
                     professional_summary: data.professional_summary || '',
                     skills: data.skills || '',
@@ -321,7 +314,7 @@ function ResumeBuilder() {
                     setHasProjects(data.has_projects);
                 }
             } else {
-                setProfile(prev => ({ ...prev, email: session.user.email || '' }));
+                setProfile(prev => ({ ...prev, email: user.email || '' }));
                 setShowUploadOption(true);
                 setIsNewUser(true);
             }
@@ -430,7 +423,7 @@ function ResumeBuilder() {
 
     const handleImproveWithAI = async () => {
         try {
-            const { data: { session } } = await supabase.auth.getSession();
+            const session = await authService.getSession();
             if (!session) {
                 alert('Please log in to use AI improvement');
                 return;
@@ -460,10 +453,11 @@ function ResumeBuilder() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`
                 },
                 body: JSON.stringify({
                     userId: session.user.id,
-                    sessionToken: session.access_token,
+                    resumeText: '', // Not used here as we send structured data
                     resumeData
                 })
             });
@@ -505,7 +499,7 @@ function ResumeBuilder() {
         
         try {
             // Check user session
-            const { data: { session } } = await supabase.auth.getSession();
+            const session = await authService.getSession();
             if (!session) {
                 alert('Please log in to download your resume');
                 setIsDownloading(false);
@@ -895,39 +889,29 @@ function ResumeBuilder() {
         setSuccessMessage('');
         
         try {
-            const { data: { session } } = await supabase.auth.getSession();
-            
-            if (!session) {
+            if (!user) {
                 alert('Please log in to save your profile');
                 setSaving(false);
                 return;
             }
 
-            const { data, error } = await supabase
-                .from('user_profiles')
-                .upsert({
-                    user_id: session.user.id,
-                    full_name: profile.full_name,
-                    location: profile.location,
-                    phone: profile.phone,
-                    email: profile.email,
-                    linkedin: profile.linkedin,
-                    professional_summary: profile.professional_summary,
-                    skills: profile.skills,
-                    volunteering: profile.volunteering,
-                    work_experience: hasWorkExperience ? workExperience : [],
-                    education: hasEducation ? education : [],
-                    projects: hasProjects ? projects : [],
-                    has_projects: hasProjects,
-                    has_work_experience: hasWorkExperience,
-                    has_education: hasEducation
-                }, {
-                    onConflict: 'user_id'
-                });
-
-            if (error) {
-                throw error;
-            }
+            await dbService.upsertProfile({
+                user_id: user.id,
+                full_name: profile.full_name,
+                location: profile.location,
+                phone: profile.phone,
+                email: profile.email,
+                linkedin: profile.linkedin,
+                professional_summary: profile.professional_summary,
+                skills: profile.skills,
+                volunteering: profile.volunteering,
+                work_experience: hasWorkExperience ? workExperience : [],
+                education: hasEducation ? education : [],
+                projects: hasProjects ? projects : [],
+                has_projects: hasProjects,
+                has_work_experience: hasWorkExperience,
+                has_education: hasEducation
+            });
 
             setSuccessMessage('Resume information saved successfully!');
             

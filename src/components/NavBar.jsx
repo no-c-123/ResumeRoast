@@ -1,46 +1,63 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
+import { useAuth } from '../contexts/AuthContext';
+import { logger } from '../lib/logger';
 
 export default function NavBar() {
+    const { user, profile, signOut } = useAuth();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [currentPath, setCurrentPath] = useState('');
-    const [isLoggedIn, setIsLoggedIn] = useState(null);
+    const [scrolled, setScrolled] = useState(false);
+    const [initials, setInitials] = useState('');
+    
+    // Backward compatibility for existing JSX
+    const isLoggedIn = user;
+    const setIsLoggedIn = () => {};
 
     useEffect(() => {
-        // Initial path set
+        const handleScroll = () => {
+            const isScrolled = window.scrollY > 10;
+            setScrolled(isScrolled);
+        };
+
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
+
+    useEffect(() => {
         if (typeof window !== 'undefined') {
             setCurrentPath(window.location.pathname);
         }
-
-        const getSession = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session) {
-                setIsLoggedIn(session.user);
-            }
-        }
-
-        getSession();
-
-        const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-            if (session) {
-                setIsLoggedIn(session.user);
-            } else {
-                setIsLoggedIn(null);
-            }
-        });
 
         const handlePageLoad = () => {
             setCurrentPath(window.location.pathname);
         };
 
         document.addEventListener('astro:page-load', handlePageLoad);
-
-        return () => {
-            authListener.subscription.unsubscribe();
-            document.removeEventListener('astro:page-load', handlePageLoad);
-        };
-
+        return () => document.removeEventListener('astro:page-load', handlePageLoad);
     }, []);
+
+    useEffect(() => {
+        if (profile?.full_name) {
+             const nameParts = profile.full_name.split(' ');
+             if (nameParts.length >= 2) {
+                 setInitials(`${nameParts[0][0]}${nameParts[1][0]}`.toUpperCase());
+             } else {
+                 setInitials(profile.full_name.substring(0, 2).toUpperCase());
+             }
+        } else if (user?.email) {
+             setInitials(user.email.substring(0, 2).toUpperCase());
+        }
+    }, [profile, user]);
+
+    const handleSignOut = async () => {
+        try {
+            await signOut();
+            window.location.href = '/';
+        } catch (error) {
+            logger.error('Error signing out:', error);
+        }
+    };
 
     return (
         <div className="w-full h-16 md:h-20 flex items-center justify-between px-4 md:px-8 sticky top-0 z-50 pt-2 bg-black/30 backdrop-blur-2xl border-b-[0.5px] border-white/10">
@@ -92,10 +109,7 @@ export default function NavBar() {
                             Dashboard
                         </a>
                         <button 
-                            onClick={async () => {
-                                await supabase.auth.signOut();
-                                setIsLoggedIn(null);
-                            }}
+                            onClick={handleSignOut}
                             className="bg-gradient-to-r from-[#FF6333FF] to-[#DC2626FF] rounded-3xl w-24 h-10 text-white hover:opacity-90 duration-300"
                         >
                             Logout
@@ -148,10 +162,29 @@ export default function NavBar() {
                         Pricing
                     </a>
                     <div className="flex flex-col gap-2 pt-2 border-t border-white/10">
-                        <a href="/login" className="text-white py-2">Login</a>
-                        <button className="bg-gradient-to-r from-[#FF6333FF] to-[#DC2626FF] rounded-3xl w-full h-10 text-white">
-                            Sign Up
-                        </button>
+                        {isLoggedIn ? (
+                            <>
+                                <a 
+                                    href="/dashboard" 
+                                    className="text-white py-2"
+                                >
+                                    Dashboard
+                                </a>
+                                <button 
+                                    onClick={handleSignOut}
+                                    className="bg-gradient-to-r from-[#FF6333FF] to-[#DC2626FF] rounded-3xl w-full h-10 text-white"
+                                >
+                                    Logout
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <a href="/login" className="text-white py-2">Login</a>
+                                <button className="bg-gradient-to-r from-[#FF6333FF] to-[#DC2626FF] rounded-3xl w-full h-10 text-white">
+                                    Sign Up
+                                </button>
+                            </>
+                        )}
                     </div>
                 </div>
             </div>

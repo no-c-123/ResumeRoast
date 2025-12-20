@@ -1,5 +1,6 @@
 import { stripe } from '../../lib/stripe';
 import { supabaseAdmin } from '../../lib/supabaseAdmin';
+import { logger } from '../../lib/logger';
 
 export const POST = async ({ request }) => {
   const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET || import.meta.env.STRIPE_WEBHOOK_SECRET;
@@ -16,7 +17,7 @@ export const POST = async ({ request }) => {
         endpointSecret
       );
     } catch (err) {
-      console.log(`⚠️  Webhook signature verification failed.`, err.message);
+      logger.log(`⚠️  Webhook signature verification failed.`, err.message);
       return new Response(JSON.stringify({ error: 'Webhook signature verification failed' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' }
@@ -66,7 +67,7 @@ export const POST = async ({ request }) => {
         break;
       }
       default:
-        console.log(`Unhandled event type: ${event.type}`);
+        logger.log(`Unhandled event type: ${event.type}`);
     }
 
     return new Response(JSON.stringify({ received: true }), {
@@ -74,7 +75,7 @@ export const POST = async ({ request }) => {
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (err) {
-    console.error('Error handling webhook:', err);
+    logger.error('Error handling webhook:', err);
     return new Response(JSON.stringify({ error: 'Webhook handler failed' }), { status: 500 });
   }
 };
@@ -107,7 +108,7 @@ async function handleCheckoutCompleted(session) {
     }
 
     if (!user) {
-      console.error('User not found for checkout session:', session.id);
+      logger.error('User not found for checkout session:', session.id);
       return;
     }
 
@@ -157,9 +158,9 @@ async function handleCheckoutCompleted(session) {
         .insert(subscriptionData);
     }
 
-    console.log(`Subscription created/updated for user ${user.id}: ${plan}`);
+    logger.log(`Subscription created/updated for user ${user.id}: ${plan}`);
   } catch (err) {
-    console.error('Error in handleCheckoutCompleted:', err);
+    logger.error('Error in handleCheckoutCompleted:', err);
   }
 }
 
@@ -186,7 +187,7 @@ async function handleSubscriptionUpdate(subscription) {
     }
 
     if (!user) {
-      console.error('User not found for subscription update');
+      logger.error('User not found for subscription update');
       return;
     }
 
@@ -211,9 +212,9 @@ async function handleSubscriptionUpdate(subscription) {
       .update(subscriptionData)
       .eq('user_id', user.id);
 
-    console.log(`Subscription updated for user ${user.id}`);
+    logger.log(`Subscription updated for user ${user.id}`);
   } catch (err) {
-    console.error('Error in handleSubscriptionUpdate:', err);
+    logger.error('Error in handleSubscriptionUpdate:', err);
   }
 }
 
@@ -236,9 +237,9 @@ async function handleSubscriptionDeleted(subscription) {
       })
       .eq('user_id', user.id);
 
-    console.log(`Subscription canceled for user ${user.id}`);
+    logger.log(`Subscription canceled for user ${user.id}`);
   } catch (err) {
-    console.error('Error in handleSubscriptionDeleted:', err);
+    logger.error('Error in handleSubscriptionDeleted:', err);
   }
 }
 
@@ -252,7 +253,7 @@ async function handlePaymentSucceeded(invoice) {
     const subscription = await stripe.subscriptions.retrieve(subscriptionId);
     await handleSubscriptionUpdate(subscription);
   } catch (err) {
-    console.error('Error in handlePaymentSucceeded:', err);
+    logger.error('Error in handlePaymentSucceeded:', err);
   }
 }
 
@@ -279,8 +280,8 @@ async function handlePaymentFailed(invoice) {
       })
       .eq('user_id', user.id);
 
-    console.log(`Payment failed for user ${user.id}`);
+    logger.log(`Payment failed for user ${user.id}`);
   } catch (err) {
-    console.error('Error in handlePaymentFailed:', err);
+    logger.error('Error in handlePaymentFailed:', err);
   }
 }

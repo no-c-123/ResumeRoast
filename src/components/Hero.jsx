@@ -161,11 +161,6 @@ function Hero() {
                                 openFilePicker();
                         }}
                     >
-                        {isLoading && (
-                            <div className="absolute inset-0 bg-black/70 flex items-center justify-center rounded-xl z-10">
-                                <Loader />
-                            </div>
-                        )}
                     
                         <img src="/logo-orange.png" alt="logo-orange" className="w-20 h-20 mb-4"/>
                         

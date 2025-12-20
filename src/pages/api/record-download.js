@@ -9,19 +9,30 @@ const supabase = createClient(
 
 export async function POST({ request }) {
   try {
-    const { userId, resumeType = 'standard' } = await request.json();
-
-    if (!userId) {
-      return new Response(
-        JSON.stringify({ error: 'User ID is required' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
+    const authHeader = request.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Missing authorization header' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    const { resumeType = 'standard' } = await request.json();
 
     const { error } = await supabase
       .from('resume_downloads')
       .insert({
-        user_id: userId,
+        user_id: user.id,
         resume_type: resumeType,
         downloaded_at: new Date().toISOString()
       });

@@ -1,24 +1,28 @@
 import { useEffect, useState, useRef } from 'react';
-import { supabase } from '../lib/supabaseClient';
+import { useAuth } from '../contexts/AuthContext';
+import { authService } from '../services/supabase';
 import { logger } from '../lib/logger';
 import Loader from './uicomponents/Loader.jsx';
 import AnalysisResults from './AnalysisResults.jsx';
+import { useSubscription } from '../hooks/useSubscription';
+import { useRecentAnalyses } from '../hooks/useRecentAnalyses';
+import { useResumeAnalyzer } from '../hooks/useResumeAnalyzer';
 
-function AccountDashborad() {
-
-    const [isLoggedIn, setIsLoggedIn] = useState(null);
+function AccountDashboard() {
+    const { user: isLoggedIn, signOut } = useAuth();
     const [currentTab, setCurrentTab] = useState('resume');
+
+    // Hooks
+    const { subscription, loading: subLoading } = useSubscription(isLoggedIn);
+    const { analyses: recentAnalyses, stats, loading: historyLoading, refetch: refetchHistory } = useRecentAnalyses(isLoggedIn);
+    const { analyzeResume, analyzing, error: analyzeError } = useResumeAnalyzer();
 
     // Upload Logic
     const fileInputRef = useRef(null);
     const [isDragging, setIsDragging] = useState(false);
     const [selectedFile, setSelectedFile] = useState(null);
-    const [error, setError] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
+    const [localError, setLocalError] = useState('');
     const [currentAnalysis, setCurrentAnalysis] = useState(null);
-    const [recentAnalyses, setRecentAnalyses] = useState([]);
-    const [subscription, setSubscription] = useState(null);
-    const [stats, setStats] = useState({ total: 0, avgScore: 0, lastAnalysis: null });
 
     const [deleteModal, setDeleteModal] = useState(false);
     const [showProfileUpload, setShowProfileUpload] = useState(false);
@@ -32,7 +36,7 @@ function AccountDashborad() {
 
     const handleLogout = async () => {
         try {
-            await supabase.auth.signOut();
+            await signOut();
             window.location.href = '/';
         } catch (error) {
             logger.error('Error logging out:', error);
@@ -40,9 +44,8 @@ function AccountDashborad() {
     };
 
     const deleteAccount = async () => {
-        setIsLoading(true);
         try {
-            const { data: { session } } = await supabase.auth.getSession();
+            const session = await authService.getSession();
             if (!session) {
                 throw new Error('No session found');
             }
@@ -61,27 +64,26 @@ function AccountDashborad() {
                 throw new Error(result.error || 'Failed to delete account');
             }
 
-            await supabase.auth.signOut();
+            await signOut();
             window.location.href = '/';
         } catch (error) {
             logger.error('Error deleting account:', error);
-            setError(error.message || 'Failed to delete account');
-            setIsLoading(false);
+            setLocalError(error.message || 'Failed to delete account');
         }
     }
 
     const validateAndSet = async (file) => {
-        setError('');
+        setLocalError('');
         if (!file) return;
         
         const typeOk = !file.type || ACCEPTED.includes(file.type);
         if (!typeOk) {
-            setError('Unsupported file type. Please upload a PDF or Word document.');
+            setLocalError('Unsupported file type. Please upload a PDF or Word document.');
             return;
         }
 
         if (file.size > MAX_BYTES) {
-            setError('File size exceeds 5MB limit. Please upload a smaller file.');
+            setLocalError('File size exceeds 5MB limit. Please upload a smaller file.');
             return;
         }
         
@@ -91,92 +93,22 @@ function AccountDashborad() {
     };
 
     const handleAnalyzeResume = async (file) => {
-        setIsLoading(true);
-        setError('');
-
-        try {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) {
-                throw new Error('Please log in to analyze your resume');
-            }
-
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('userId', session.user.id);
-
-            const response = await fetch('/api/analyze-resume', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${session.access_token}`
-                },
-                body: formData
-            });
-
-            const result = await response.json();
-
-            if (!response.ok) {
-                throw new Error(result.error || 'Analysis failed');
-            }
-
-            setCurrentAnalysis(result.analysis);
-            setCurrentTab('resume'); // Stay on resume tab to show results
-            await fetchRecentAnalyses(); // Refresh history
-
-        } catch (err) {
-            logger.error('Analysis error:', err);
-            setError(err.message || 'Failed to analyze resume. Please try again.');
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const fetchRecentAnalyses = async () => {
         if (!isLoggedIn) return;
+        setLocalError('');
 
         try {
-            const { data, error } = await supabase
-                .from('resume_analyses')
-                .select('*')
-                .eq('user_id', isLoggedIn.id)
-                .order('created_at', { ascending: false })
-                .limit(5);
-
-            if (error) throw error;
-            setRecentAnalyses(data || []);
-
-            // Calculate stats
-            if (data && data.length > 0) {
-                const total = data.length;
-                const avgScore = Math.round(data.reduce((sum, analysis) => sum + (analysis.ats_score || 0), 0) / total);
-                const lastAnalysis = data[0].created_at;
-                setStats({ total, avgScore, lastAnalysis });
-            } else {
-                setStats({ total: 0, avgScore: 0, lastAnalysis: null });
-            }
+            const analysis = await analyzeResume(file, isLoggedIn.id);
+            setCurrentAnalysis(analysis);
+            setCurrentTab('resume');
+            await refetchHistory();
         } catch (err) {
-            logger.error('Error fetching analyses:', err);
-        }
-    };
-
-    const fetchSubscription = async () => {
-        if (!isLoggedIn) return;
-
-        try {
-            const { data, error } = await supabase
-                .from('user_subscriptions')
-                .select('*')
-                .eq('user_id', isLoggedIn.id)
-                .maybeSingle();
-
-            if (error) throw error;
-            setSubscription(data);
-        } catch (err) {
-            logger.error('Error fetching subscription:', err);
+            // Error is already handled/logged in hook, but we can set local state if needed
+            // setLocalError(err.message); // Hook exposes 'error' state too
         }
     };
 
     const openFilePicker = () => {
-        setError('');
+        setLocalError('');
         fileInputRef.current?.click();
     }
 
@@ -206,36 +138,8 @@ function AccountDashborad() {
         validateAndSet(file);
     }
     
-    useEffect(() => {
-        const getSession = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session) {
-                setIsLoggedIn(session.user);
-            }
-        }
-
-        getSession();
-
-        const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-            if (session) {
-                setIsLoggedIn(session.user);
-            } else {
-                setIsLoggedIn(null);
-            }
-        });
-
-        return () => {
-            authListener.subscription.unsubscribe();
-        };
-
-    }, [])
-
-    useEffect(() => {
-        if (isLoggedIn) {
-            fetchRecentAnalyses();
-            fetchSubscription();
-        }
-    }, [isLoggedIn])
+    const displayError = localError || analyzeError;
+    const isLoading = analyzing || historyLoading || subLoading;
 
     return (
         <div className="min-h-screen w-full bg-black/10 flex items-center justify-center p-6">
@@ -338,15 +242,15 @@ function AccountDashborad() {
                                 <div className="flex items-center justify-between mb-2">
                                     <span className="text-neutral-400 text-xs">Current Plan</span>
                                     <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                                        subscription?.plan === 'pro' || subscription?.plan === 'premium'
+                                        subscription?.plan === 'pro' || subscription?.plan === 'premium' || subscription?.plan === 'lifetime'
                                             ? 'bg-orange-500/20 text-orange-500'
                                             : 'bg-neutral-700/50 text-neutral-400'
                                     }`}>
-                                        {subscription?.plan === 'pro' ? 'Pro' : subscription?.plan === 'premium' ? 'Premium' : 'Free'}
+                                        {subscription?.plan === 'pro' ? 'Pro' : subscription?.plan === 'premium' ? 'Premium' : subscription?.plan === 'lifetime' ? 'Lifetime' : 'Free'}
                                     </span>
                                 </div>
                                 <p className="text-white text-sm font-medium">
-                                    {subscription?.plan === 'pro' ? 'Pro Plan' : subscription?.plan === 'premium' ? 'Premium Plan' : 'Free Plan'}
+                                    {subscription?.plan === 'pro' ? 'Pro Plan' : subscription?.plan === 'premium' ? 'Premium Plan' : subscription?.plan === 'lifetime' ? 'Lifetime Plan' : 'Free Plan'}
                                 </p>
                                 {subscription && (
                                     <p className="text-xs text-neutral-500 mt-1">
@@ -355,14 +259,14 @@ function AccountDashborad() {
                                 )}
                             </div>
                             
-                            {!subscription && (
+                            {!subscription || subscription.plan === 'free' ? (
                                 <a 
                                     href="/pricing"
                                     className="w-full py-2.5 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 rounded-lg text-sm font-semibold transition-all block text-center"
                                 >
                                     Upgrade to Pro
                                 </a>
-                            )}
+                            ) : null}
 
                             <div className="pt-3 border-t border-white/10">
                                 <p className="text-xs text-neutral-400 mb-2">Recent Activity</p>
@@ -702,4 +606,4 @@ function AccountDashborad() {
     )
 }
 
-export default AccountDashborad;
+export default AccountDashboard;

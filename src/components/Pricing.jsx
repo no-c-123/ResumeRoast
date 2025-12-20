@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import PaywallModal from "./PaywallModal.jsx";
+import React from "react";
+import { PLANS } from "../lib/plans";
 
 export default function Pricing() {
 
@@ -7,138 +7,56 @@ export default function Pricing() {
         <>
             <div className={`w-full min-h-screen flex flex-col justify-center items-center pt-20 pb-20 px-4 gap-6 transform-flat`}>
             
-                
-
                 <h1 className="text-3xl md:text-5xl lg:text-6xl text-white font-bold text-center">Flexible Plans for Every Career Goal</h1>
                 <p className="text-neutral-400 text-center px-4">Choose the plan that best fits your needs and start perfecting your resume today.</p>
-            
-                <div className="grid grid-cols-1 lg:grid-cols-3 w-full max-w-[1550px] auto-rows-auto lg:h-[508px] mt-10 px-4 md:px-10 lg:px-20 gap-8 lg:gap-0 justify-items-center lg:[perspective:2000px]">
+                <div className="grid grid-cols-1 lg:grid-cols-3 w-full max-w-[1550px] auto-rows-auto lg:h-[640px] mt-10 px-4 md:px-10 lg:px-20 gap-8 lg:gap-0 justify-items-center lg:[perspective:2000px]">
                     
-                    {/* Free Plan */}
-                    <div className="w-full max-w-[432px] h-auto lg:h-[508px] flex flex-col items-center bg-[#0c0c0e] rounded-2xl lg:[transform:rotateY(15deg)] lg:hover:[transform:rotateY(0deg)] hover:scale-105 transition-all duration-300 shadow-neutral-800 shadow-2xl border border-zinc-800">
-                        <h1 className="text-4xl font-bold text-white pt-10">Free</h1>
-                        <h1 className="text-4xl font-bold text-white p-6">$0</h1>
-                        <p className="text-lg font-bold text-neutral-400">Get a quick taste of the Roast.</p>
-                        <li className="flex justify-center items-start flex-col p-4">
-                            <div className="flex h-10 gap-4 pt-4">
-                                <svg className="w-6 h-6 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
-                                </svg>
-                                <p className="text-neutral-400">Basic AI resume roast</p>
-                            </div>
-                            <div className="flex h-10 gap-4 pt-4">
-                                <svg className="w-6 h-6 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
-                                </svg>
-                                <p className="text-neutral-300">Limited roast report access</p>
-                            </div>
-                            <div className="flex h-10 gap-4 pt-4">
-                                <svg className="w-6 h-6 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
-                                </svg>
-                                <p className="text-neutral-300">1 basic feedback download</p>
-                            </div>
-                            <div className="flex h-10 gap-4 pt-4">
-                                <svg className="w-6 h-6 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
-                                </svg>
-                                <p className="text-neutral-300">Standard ATS compatibility</p>
-                            </div>
-                        </li>
-                        <button className="w-full max-w-96 mx-4 h-11 text-white font-bold text-lg bg-orange-500 rounded-2xl mt-11 hover:bg-orange-500/90"><a href="/"> Try Now</a></button>
-                    </div>
-                    {/* Pro Plan */}
-                    <div className="relative flex flex-col items-center w-full max-w-[432px] h-auto lg:h-[600px] hover:scale-105 transition-all duration-300 shadow-neutral-800 shadow-2xl [background:linear-gradient(#0c0c0e,#0c0c0e)_padding-box,conic-gradient(from_var(--border-angle),theme(colors.orange.600)_80%,_theme(colors.orange.500)_86%,_theme(colors.orange.300)_90%,_theme(colors.orange.500)_94%,_theme(colors.orange.600))_border-box] rounded-3xl border-[3px] border-transparent [animation:border_4s_linear_infinite] z-10">
-                        <p className="absolute -top-4 text-white w-28 md:w-36 h-8 flex justify-center items-center text-center text-xs md:text-sm font-bold [background:linear-gradient(#0c0c0e,#0c0c0e)_padding-box,conic-gradient(from_var(--border-angle),theme(colors.orange.600)_80%,_theme(colors.orange.500)_86%,_theme(colors.orange.300)_90%,_theme(colors.orange.500)_94%,_theme(colors.orange.600))_border-box] rounded-3xl border-[3px] border-transparent [animation:border_4s_linear_infinite] z-10">MOST POPULAR</p>
-                        <h1 className="text-4xl font-extrabold text-white pt-12">Pro</h1>
-                        <h1 className="text-4xl font-bold text-white p-6">$19<span className="text-base text-orange-400 font-normal">/mo</span></h1>
-                        <p className="text-lg font-normal text-neutral-300">Unlock your full career potential.</p>
-                        <li className="flex justify-center items-start flex-col p-4">
-                            <div className="flex h-10 gap-4 pt-4">
-                                <svg className="w-6 h-6 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
-                                </svg>
-                                <p className="text-neutral-300 font-normal">Detailed AI fixes & suggestions</p>
-                            </div>
-                            <div className="flex h-10 gap-4 pt-4">
-                                <svg className="w-6 h-6 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
-                                </svg>
-                                <p className="text-neutral-400">Unlimited roast report access</p>
-                            </div>
-                            <div className="flex h-10 gap-4 pt-4">
-                                <svg className="w-6 h-6 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
-                                </svg>
-                                <p className="text-neutral-400">Unlimited advanced feedback downloads</p>
-                            </div>
-                            <div className="flex h-10 gap-4 pt-4">
-                                <svg className="w-6 h-6 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
-                                </svg>
-                                <p className="text-neutral-400">Advanced keyword optimization</p>
-                            </div>
-                            <div className="flex h-10 gap-4 pt-4">
-                                <svg className="w-6 h-6 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
-                                </svg>
-                                <p className="text-neutral-400">Priority ATS compatibility check</p>
-                            </div>
-                            <div className="flex h-10 gap-4 pt-4">
-                                <svg className="w-6 h-6 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
-                                </svg>
-                                <p className="text-neutral-400">Priority customer support</p>
-                            </div>
-                        </li>
-                        <button className="w-full max-w-96 mx-4 h-11 text-white font-bold text-lg bg-orange-500 rounded-2xl mt-11 hover:bg-orange-500/90" onClick={() => window.location.href='/payment'}> Get Started </button>
-                    </div>
+                    {PLANS.map((plan) => (
+                        <div 
+                            key={plan.key}
+                            className={`
+                                relative flex flex-col items-center w-full max-w-[432px] h-auto 
+                                ${plan.popular ? 'lg:h-[640px] z-10' : 'lg:h-[600px]'}
+                                ${plan.key === 'free' ? 'bg-[#0c0c0e] lg:[transform:rotateY(15deg)] lg:hover:[transform:rotateY(0deg)] border border-zinc-800' : ''}
+                                ${plan.key === 'lifetime' ? 'lg:[transform:rotateY(-15deg)] lg:hover:[transform:rotateY(0deg)]' : ''}
+                                ${(plan.popular || plan.key === 'lifetime') ? '[background:linear-gradient(#0c0c0e,#0c0c0e)_padding-box,conic-gradient(from_var(--border-angle),theme(colors.orange.600)_80%,_theme(colors.orange.500)_86%,_theme(colors.orange.300)_90%,_theme(colors.orange.500)_94%,_theme(colors.orange.600))_border-box] border-[3px] border-transparent [animation:border_4s_linear_infinite]' : ''}
+                                hover:scale-105 transition-all duration-300 shadow-neutral-800 shadow-2xl rounded-2xl md:rounded-3xl
+                            `}
+                        >
+                            {plan.popular && (
+                                <p className="absolute -top-4 text-white w-28 md:w-36 h-8 flex justify-center items-center text-center text-xs md:text-sm font-bold [background:linear-gradient(#0c0c0e,#0c0c0e)_padding-box,conic-gradient(from_var(--border-angle),theme(colors.orange.600)_80%,_theme(colors.orange.500)_86%,_theme(colors.orange.300)_90%,_theme(colors.orange.500)_94%,_theme(colors.orange.600))_border-box] rounded-3xl border-[3px] border-transparent [animation:border_4s_linear_infinite] z-10">MOST POPULAR</p>
+                            )}
+                            
+                            <h1 className={`text-4xl font-bold text-white ${plan.popular ? 'pt-12' : 'pt-10'}`}>{plan.name}</h1>
+                            <h1 className="text-4xl font-bold text-white p-6">
+                                {plan.price}
+                                {plan.priceDetail && <span className={`text-base font-normal ${plan.key === 'lifetime' ? 'text-orange-400' : 'text-orange-400'}`}>{plan.priceDetail}</span>}
+                            </h1>
+                            
+                            {plan.key === 'free' && <p className="text-lg font-bold text-neutral-400">Get a quick taste of the Roast.</p>}
+                            {plan.key === 'pro' && <p className="text-lg font-normal text-neutral-300">Unlock your full career potential.</p>}
+                            {plan.key === 'lifetime' && <p className="text-lg font-bold text-neutral-400 px-8 text-center">Pay once, own it forever.</p>}
 
-                    {/* One-Time Payment Plan */}
-                    <div className="flex flex-col items-center w-full max-w-[432px] h-auto lg:h-[550px] lg:[transform:rotateY(-15deg)] lg:hover:[transform:rotateY(0deg)] hover:scale-105 transition-all duration-300 shadow-neutral-800 shadow-2xl [background:linear-gradient(#0c0c0e,#0c0c0e)_padding-box,conic-gradient(from_var(--border-angle),theme(colors.orange.600)_80%,_theme(colors.orange.500)_86%,_theme(colors.orange.300)_90%,_theme(colors.orange.500)_94%,_theme(colors.orange.600))_border-box] rounded-3xl border-[3px] border-transparent [animation:border_4s_linear_infinite]">
-                        <h1 className="text-4xl font-bold text-white pt-10">Lifetime</h1>
-                        <h1 className="text-4xl font-bold text-white p-6">$149<span className="text-base text-orange-400"> once</span></h1>
-                        <p className="text-lg font-bold text-neutral-400 px-8 text-center">Pay once, own it forever.</p>
-                        <li className="flex justify-center items-start flex-col p-4">
-                            <div className="flex h-10 gap-4 pt-4">
-                                <svg className="w-6 h-6 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
-                                </svg>
-                                <p className="text-neutral-300 font-normal">Detailed AI fixes & suggestions</p>
-                            </div>
-                            <div className="flex h-10 gap-4 pt-4">
-                                <svg className="w-6 h-6 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
-                                </svg>
-                                <p className="text-neutral-400">Unlimited roast report access</p>
-                            </div>
-                            <div className="flex h-10 gap-4 pt-4">
-                                <svg className="w-6 h-6 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
-                                </svg>
-                                <p className="text-neutral-400">Unlimited advanced feedback downloads</p>
-                            </div>
-                            <div className="flex h-10 gap-4 pt-4">
-                                <svg className="w-6 h-6 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
-                                </svg>
-                                <p className="text-neutral-400">Advanced keyword optimization</p>
-                            </div>
-                            <div className="flex h-10 gap-4 pt-4">
-                                <svg className="w-6 h-6 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
-                                </svg>
-                                <p className="text-neutral-400">Priority ATS compatibility check</p>
-                            </div>
-                            <div className="flex h-10 gap-4 pt-4">
-                                <svg className="w-6 h-6 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
-                                </svg>
-                                <p className="text-neutral-400">Priority customer support</p>
-                            </div>
-                        </li>
-                        <button className="w-full max-w-96 mx-4 h-11 text-white font-bold text-lg bg-orange-500 rounded-2xl mt-2 hover:bg-orange-500/90" onClick={() => window.location.href='/payment'}> Get Started </button>
-                    </div>
+                            <li className="flex justify-center items-start flex-col p-4 w-full px-8">
+                                {plan.features.map((feature, idx) => (
+                                    <div key={idx} className="flex h-10 gap-4 pt-4 items-center w-full">
+                                        <svg className="w-6 h-6 text-green-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
+                                        </svg>
+                                        <p className="text-neutral-300 text-sm md:text-base font-normal">{feature}</p>
+                                    </div>
+                                ))}
+                            </li>
+                            
+                            <button 
+                                className={`w-full max-w-72 md:max-w-96 mx-4 h-11 text-white font-bold text-lg bg-orange-500 rounded-2xl ${plan.popular ? 'mt-auto mb-8' : 'mt-auto mb-8'} hover:bg-orange-500/90`}
+                                onClick={() => window.location.href = plan.key === 'free' ? '/' : '/payment'}
+                            > 
+                                {plan.button}
+                            </button>
+                        </div>
+                    ))}
+
                 </div>
 
                 {/* Detailed Plan Comparison */}
@@ -317,7 +235,5 @@ export default function Pricing() {
                 </div>
             </div>
         </>
-
-        
     )
 }

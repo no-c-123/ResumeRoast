@@ -9,17 +9,26 @@ const supabase = createClient(
 
 export async function POST({ request }) {
   try {
-    const { userId } = await request.json();
+    const authHeader = request.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Missing authorization header' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
 
-    if (!userId) {
-      return new Response(
-        JSON.stringify({ error: 'User ID is required' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
 
     const { data, error } = await supabase.rpc('check_download_limit', {
-      user_uuid: userId
+      user_uuid: user.id
     });
 
     if (error) {

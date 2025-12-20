@@ -4,6 +4,8 @@ import { extractTextFromFile } from '../../lib/fileParser.js';
 import { parseResumeTextToStructuredData } from '../../lib/resumeParser.js';
 import { checkRateLimit } from '../../lib/rateLimit.js';
 import { checkSubscription } from '../../lib/entitlement.js';
+import { logger } from '../../lib/logger';
+import { MetadataSchema } from '../../lib/schemas';
 
 export const prerender = false;
 
@@ -29,11 +31,23 @@ export async function POST({ request }) {
 
     const formData = await request.formData();
     const file = formData.get('file');
-    const userId = formData.get('userId');
-    const careerLevel = formData.get('careerLevel') || 'professional';
+    
+    // Validate non-file fields
+    const rawMetadata = {
+        userId: formData.get('userId'),
+        careerLevel: formData.get('careerLevel') || undefined
+    };
 
-    if (!file || !userId) {
-      return new Response(JSON.stringify({ error: 'Missing required fields' }), {
+    const result = MetadataSchema.safeParse(rawMetadata);
+
+    if (!result.success) {
+        return new Response(JSON.stringify({ error: 'Invalid input', details: result.error.format() }), { status: 400 });
+    }
+
+    const { userId, careerLevel } = result.data;
+
+    if (!file) {
+      return new Response(JSON.stringify({ error: 'Missing resume file' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' }
       });
@@ -99,12 +113,12 @@ export async function POST({ request }) {
     // Extract text from resume
     let resumeText;
     try {
-      console.log('Starting text extraction for file:', file.name, 'type:', file.type, 'size:', file.size);
+      logger.log('Starting text extraction for file:', file.name, 'type:', file.type, 'size:', file.size);
       resumeText = await extractTextFromFile(file);
-      console.log('Extracted text length:', resumeText?.length);
-      console.log('First 300 characters:', resumeText?.substring(0, 300));
+      logger.log('Extracted text length:', resumeText?.length);
+      logger.log('First 300 characters:', resumeText?.substring(0, 300));
     } catch (extractError) {
-      console.error('Error extracting text:', extractError);
+      logger.error('Error extracting text:', extractError);
       return new Response(JSON.stringify({ 
         error: 'Unable to read the resume file. Please ensure it is a valid PDF or Word document.' 
       }), {
@@ -331,7 +345,7 @@ Format your response as valid JSON with this exact structure:
       const cleanJson = jsonMatch ? jsonMatch[1] : responseText;
       analysis = JSON.parse(cleanJson);
     } catch (parseError) {
-      console.error('Failed to parse Claude response:', parseError);
+      logger.error('Failed to parse Claude response:', parseError);
       return new Response(JSON.stringify({ error: 'Our AI had trouble analyzing your resume. Please try again.' }), {
         status: 500,
         headers: { 'Content-Type': 'application/json' }
@@ -388,7 +402,7 @@ Format your response as valid JSON with this exact structure:
       .single();
 
     if (dbError) {
-      console.error('Database error:', dbError);
+      logger.error('Database error:', dbError);
       return new Response(JSON.stringify({ error: 'Failed to save analysis results. Please try again.' }), {
         status: 500,
         headers: { 'Content-Type': 'application/json' }
@@ -404,7 +418,7 @@ Format your response as valid JSON with this exact structure:
     });
 
   } catch (error) {
-    console.error('Error analyzing resume:', error);
+    logger.error('Error analyzing resume:', error);
     return new Response(JSON.stringify({ 
       error: 'An unexpected error occurred during analysis. Please try again later.' 
     }), {

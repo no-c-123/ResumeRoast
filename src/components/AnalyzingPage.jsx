@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabaseClient';
+import { authService } from '../services/supabase';
 import { getFile, removeFile } from '../lib/storage';
 import { logger } from '../lib/logger';
 
@@ -107,7 +107,7 @@ function AnalyzingPage() {
             }
 
             // Get current user session
-            const { data: { session } } = await supabase.auth.getSession();
+            const session = await authService.getSession();
             if (!session) {
                 // Cleanup
                 if (metaData) {

@@ -26,12 +26,11 @@ const ProductDisplay = ({ initialTab }) => {
 
   const handleCheckout = async () => {
     // Get current user session
-    const { supabase } = await import('../lib/supabaseClient');
-    const { data: { session } } = await supabase.auth.getSession();
+    const { authService } = await import('../services/supabase');
+    const session = await authService.getSession();
     
     const payload = {
-      price_id: plan.price_id || undefined,
-      lookup_key: plan.lookup_key || undefined,
+      planKey: plan.key,
       mode: plan.mode || (plan.key === 'lifetime' ? 'payment' : 'subscription'),
       user_id: session?.user?.id || undefined, // Include user_id if available
     };
