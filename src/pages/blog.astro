@@ -1,0 +1,116 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { getCollection } from 'astro:content';
+import type { CollectionEntry } from 'astro:content';
+
+const posts = await getCollection('blog');
+// Sort by date desc
+posts.sort((a: CollectionEntry<'blog'>, b: CollectionEntry<'blog'>) => {
+    const dateA = new Date(a.data.date).valueOf();
+    const dateB = new Date(b.data.date).valueOf();
+    return dateB - dateA;
+});
+
+const formatDate = (date: Date) => {
+  try {
+    return new Date(date).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+    });
+  } catch (e) {
+    return '';
+  }
+};
+---
+
+<Layout>
+  <div class="min-h-screen bg-black text-white pt-24 pb-12">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      
+      <!-- Header -->
+      <div class="text-center mb-16">
+        <h1 class="pt-12 text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-orange-500 to-orange-600/50 bg-clip-text text-transparent">
+          Resume Roast Blog
+        </h1>
+        <p class="text-neutral-400 pt-6 pb-12 text-lg max-w-2xl mx-auto">
+          Insights, updates, and expert advice on building the perfect resume and landing your dream job.
+        </p>
+      </div>
+
+      <!-- Featured Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
+        {posts.map((post: CollectionEntry<'blog'>) => (
+          <a 
+            href={post.data.externalUrl || `/blog/${post.slug}`} 
+            class="block"
+            target={post.data.externalUrl ? "_blank" : "_self"}
+            rel={post.data.externalUrl ? "noopener noreferrer" : ""}
+          >
+            <article class="bg-neutral-900/50 border border-white/10 rounded-2xl p-6 hover:border-orange-500/50 transition-all cursor-pointer group h-full flex flex-col relative overflow-hidden">
+              {post.data.externalUrl && (
+                <div class="absolute top-0 right-0 p-2 bg-orange-500/10 rounded-bl-xl border-b border-l border-orange-500/20">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-orange-500">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                    </svg>
+                </div>
+              )}
+              <div class="flex items-center gap-4 text-xs text-neutral-500 mb-4">
+                <span class="text-orange-500 font-medium">{post.data.category}</span>
+                <span>•</span>
+                <span>{formatDate(post.data.date)}</span>
+                {post.data.source && (
+                    <>
+                        <span>•</span>
+                        <span class="text-neutral-400 font-medium flex items-center gap-1">
+                            {post.data.source === 'LinkedIn' && (
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
+                                    <path d="M0 1.146C0 .513.526 0 1.175 0h13.65C15.474 0 16 .513 16 1.146v13.708c0 .633-.526 1.146-1.175 1.146H1.175C.526 16 0 15.487 0 14.854V1.146zm4.943 12.248V6.169H2.542v7.225h2.401zm-1.2-8.212c.837 0 1.358-.554 1.358-1.248-.015-.709-.52-1.248-1.342-1.248-.822 0-1.359.54-1.359 1.248 0 .694.521 1.248 1.327 1.248h.016zm4.908 8.212V9.359c0-.216.016-.432.08-.586.173-.431.568-.878 1.232-.878.869 0 1.216.662 1.216 1.634v3.865h2.401V9.25c0-2.22-1.184-3.252-2.764-3.252-1.274 0-1.845.7-2.165 1.193v.025h-.016a5.54 5.54 0 0 1 .016-.025V6.169h-2.4c.03.678 0 7.225 0 7.225h2.4z"/>
+                                </svg>
+                            )}
+                            {post.data.source}
+                        </span>
+                    </>
+                )}
+              </div>
+              <h2 class="text-xl font-bold mb-3 group-hover:text-orange-500 transition-colors">
+                {post.data.title}
+              </h2>
+              <p class="text-neutral-400 text-sm leading-relaxed mb-6 flex-1">
+                {post.data.excerpt}
+              </p>
+              <div class="flex items-center justify-between mt-auto pt-4 border-t border-white/5">
+                <span class="text-xs text-neutral-500">{post.data.readTime}</span>
+                <span class="text-orange-500 text-sm font-medium group-hover:translate-x-1 transition-transform flex items-center gap-1">
+                  {post.data.externalUrl ? `Read on ${post.data.source || 'External Site'}` : 'Read Article'}
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+                    <path fill-rule="evenodd" d="M3 10a.75.75 0 01.75-.75h10.638L10.23 5.29a.75.75 0 111.04-1.08l5.5 5.25a.75.75 0 010 1.08l-5.5 5.25a.75.75 0 11-1.04-1.08l4.158-3.96H3.75A.75.75 0 013 10z" clip-rule="evenodd" />
+                  </svg>
+                </span>
+              </div>
+            </article>
+          </a>
+        ))}
+      </div>
+
+      <!-- Newsletter -->
+      <div class="mt-20 bg-gradient-to-r from-orange-900/20 to-red-900/20 rounded-3xl p-8 md:p-12 border border-orange-500/20 text-center">
+        <h2 class="text-2xl md:text-3xl font-bold mb-4">Stay ahead of the competition</h2>
+        <p class="text-neutral-400 mb-8 max-w-lg mx-auto">
+          Get the latest resume tips and career advice delivered straight to your inbox.
+        </p>
+        <div class="flex flex-col sm:flex-row gap-4 justify-center max-w-md mx-auto">
+          <input 
+            type="email" 
+            placeholder="Enter your email" 
+            class="bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-neutral-500 focus:outline-none focus:border-orange-500 flex-1"
+          />
+          <button class="bg-orange-500 hover:bg-orange-600 text-white font-semibold px-6 py-3 rounded-xl transition-colors">
+            Subscribe
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</Layout>

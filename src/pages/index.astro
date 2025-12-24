@@ -1,10 +1,12 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import Hero from '../components/Hero.jsx';
+import EmailConfirmationBanner from '../components/uicomponents/EmailConfirmationBanner.jsx';
 ---
 
 <div transition:animate="slide" transition:name="slide-up">
 	<Layout>
+        <EmailConfirmationBanner client:load />
 		<Hero client:load/>
 	</Layout>
 </div>

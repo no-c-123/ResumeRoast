@@ -1,11 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
+import { logger } from '../../lib/logger';
 
 export const prerender = false;
-
-const supabase = createClient(
-  import.meta.env.PUBLIC_SUPABASE_URL,
-  import.meta.env.PUBLIC_SUPABASE_ANON_KEY
-);
 
 export async function POST({ request }) {
   try {
@@ -16,6 +12,18 @@ export async function POST({ request }) {
         headers: { 'Content-Type': 'application/json' }
       });
     }
+
+    const supabase = createClient(
+      import.meta.env.PUBLIC_SUPABASE_URL,
+      import.meta.env.PUBLIC_SUPABASE_ANON_KEY,
+      {
+        global: {
+          headers: {
+            Authorization: authHeader
+          }
+        }
+      }
+    );
 
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
@@ -32,7 +40,7 @@ export async function POST({ request }) {
     });
 
     if (error) {
-      console.error('Error checking download limit:', error);
+      logger.error('Error checking download limit:', error);
       return new Response(
         JSON.stringify({ 
           error: 'Failed to check download limit',
@@ -58,7 +66,7 @@ export async function POST({ request }) {
       { status: 200, headers: { 'Content-Type': 'application/json' } }
     );
   } catch (err) {
-    console.error('Error in check-download-limit API:', err);
+    logger.error('Error in check-download-limit API:', err);
     return new Response(
       JSON.stringify({ error: 'Internal server error' }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }

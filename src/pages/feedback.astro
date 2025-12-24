@@ -1,0 +1,21 @@
+---
+import Layout from '../layouts/Layout.astro';
+import TestimonialForm from '../components/TestimonialForm.jsx';
+---
+
+<Layout>
+    <div class="min-h-screen bg-black text-white pt-24 pb-12">
+        <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <h1 class="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">
+                    We Value Your Feedback
+                </h1>
+                <p class="text-neutral-400 text-lg">
+                    Help us build the best resume tool in the world.
+                </p>
+            </div>
+            
+            <TestimonialForm client:load />
+        </div>
+    </div>
+</Layout>

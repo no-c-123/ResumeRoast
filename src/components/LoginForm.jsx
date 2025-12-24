@@ -2,18 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { authService, dbService } from '../services/supabase';
 import { logger } from '../lib/logger';
 import { occupations } from '../data/occupations';
+import { useAuth } from '../contexts/AuthContext';
 
 function LoginForm() {
-        // Redirect if already logged in (prevents OAuth login loop)
-        useEffect(() => {
-            const checkSession = async () => {
-                const session = await authService.getSession();
-                if (session && session.user) {
-                    window.location.href = '/dashboard';
-                }
-            };
-            checkSession();
-        }, []);
+    const { user, isAuthenticated } = useAuth();
+
     const [isSignUp, setIsSignUp] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [showSignupPassword, setShowSignupPassword] = useState(false);
@@ -25,6 +18,7 @@ function LoginForm() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [errorMessage, setErrorMessage] = useState('');
+    const [successMessage, setSuccessMessage] = useState('');
     
     // Sign Up setup
     const [name, setName] = useState('');
@@ -42,36 +36,56 @@ function LoginForm() {
     const handleLogin = async (e) => {
         e.preventDefault();
         setErrorMessage('');
+        setIsLoading(true);
+        logger.log('Attempting login...');
 
-        const { data, error } = await authService.signInWithPassword({
-            email,
-            password,
-        })
+        try {
+            // 15 second timeout
+            const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Login request timed out. Please check your connection.')), 15000)
+            );
 
-        if (error) {
-            setErrorMessage(error.message);
-            setIsLoading(false);
-            return;
-        }
+            const { data, error } = await Promise.race([
+                authService.signInWithPassword({ email, password }),
+                timeoutPromise
+            ]);
 
-        if (data.user) {
-            // Check if user has a profile to determine if it's their first time
-            try {
-                const profile = await dbService.getProfile(data.user.id);
-
-                if (profile) {
-                    window.location.href = '/';
-                } else {
-                    window.location.href = '/resume-builder?new=true';
-                }
-            } catch (err) {
-                 logger.error('Error fetching profile on login:', err);
-                 window.location.href = '/'; // Fallback
+            if (error) {
+                logger.error('Login failed:', error);
+                setErrorMessage(error.message);
+                setIsLoading(false);
+                return;
             }
-        } else {
-            window.location.href = '/verify-email';
+
+            logger.log('Login successful, processing user...', data.user?.id);
+
+            if (data.user) {
+                // Check if user has a profile to determine if it's their first time
+                try {
+                    setSuccessMessage('Login successful! Redirecting...');
+                    
+                    const profile = await dbService.getProfile(data.user.id);
+                    logger.log('Profile found:', !!profile);
+
+                    setTimeout(() => {
+                        if (profile) {
+                            window.location.href = '/dashboard';
+                        } else {
+                            window.location.href = '/resume-builder?new=true';
+                        }
+                    }, 1500);
+                } catch (err) {
+                    logger.error('Error fetching profile on login:', err);
+                    window.location.href = '/dashboard'; // Fallback
+                }
+            } else {
+                window.location.href = '/verify-email';
+            }
+        } catch (err) {
+            logger.error('Unexpected login error:', err);
+            setErrorMessage('An unexpected error occurred.');
+            setIsLoading(false);
         }
-        
     }
 
     const handleOAuthLogin = async (provider) => {
@@ -95,6 +109,7 @@ function LoginForm() {
         e.preventDefault();
         setErrorMessage('');
         setIsLoading(true);
+        logger.log('Attempting sign up...');
 
         if (password !== confirmPassword) {
             setErrorMessage('Passwords do not match.');
@@ -102,47 +117,68 @@ function LoginForm() {
             return;
         }
 
-        const { data, error } = await authService.signUp({
-            email,
-            password,
-            options: {
-                data: { name: name.trim(), lastname: lastname.trim(), occupation: occupation.trim() },
-                emailRedirectTo: `${window.location.origin}/resume-builder`
-            },
-        });
+        try {
+            const { data, error } = await authService.signUp({
+                email,
+                password,
+                options: {
+                    data: { name: name.trim(), lastname: lastname.trim(), occupation: occupation.trim() },
+                    emailRedirectTo: `${window.location.origin}/onboarding`
+                },
+            });
 
-        if (error) {
-            setErrorMessage(error.message);
-            setIsLoading(false);
-            return;
-        }
+            if (error) {
+                logger.error('Sign up failed:', error);
+                setErrorMessage(error.message);
+                setIsLoading(false);
+                return;
+            }
 
-        if (data.user) {
-            try {
-                // We use supabase client directly in dbService for this insert if upsertProfile handles it?
-                // upsertProfile handles inserts too.
-                await dbService.upsertProfile({
-                    user_id: data.user.id,
-                    full_name: `${name.trim()} ${lastname.trim()}`,
-                    email: email,
-                });
-            } catch (profileError) {
-                // Ignore duplicate key error as it means profile already exists
-                if (profileError.code !== '23505') {
-                    logger.error('Profile creation error:', profileError.message);
+            if (data.user) {
+                logger.log('Sign up successful, creating profile...');
+                try {
+                    await dbService.upsertProfile({
+                        user_id: data.user.id,
+                        full_name: `${name.trim()} ${lastname.trim()}`,
+                        email: email,
+                    });
+                } catch (profileError) {
+                    if (profileError.code !== '23505') {
+                        logger.error('Profile creation error:', profileError.message);
+                    }
                 }
-            }
 
-            if (data.session) {
-                window.location.href = '/resume-builder?new=true';
+                if (data.session) {
+                    setSuccessMessage('Account created! Redirecting...');
+                    setTimeout(() => {
+                        window.location.href = '/resume-builder?new=true';
+                    }, 1500);
+                } else {
+                    // Try to sign in automatically if no session returned (Supabase sometimes does this if confirm is off)
+                    const { data: signInData, error: signInError } = await authService.signInWithPassword({
+                        email,
+                        password
+                    });
+
+                    if (signInData?.session) {
+                        setSuccessMessage('Account created! Redirecting...');
+                        setTimeout(() => {
+                            window.location.href = '/resume-builder?new=true';
+                        }, 1500);
+                    } else {
+                        // Fallback if auto-login fails (e.g. email confirmation required)
+                        window.location.href = '/verify-email';
+                    }
+                }
             } else {
-                window.location.href = '/verify-email';
+                setErrorMessage('User ID not found after sign up.');
+                setIsLoading(false);
             }
-        } else {
-            setErrorMessage('User ID not found after sign up.');
+        } catch (err) {
+            logger.error('Unexpected sign up error:', err);
+            setErrorMessage('An unexpected error occurred.');
             setIsLoading(false);
         }
-
     }
 
     return (
@@ -232,7 +268,7 @@ function LoginForm() {
                                     </div>
                                 </div>
 
-                                <form className="relative w-full h-full flex flex-col items-center gap-4 md:gap-6 p-4" action="">
+                                <form className="relative w-full h-full flex flex-col items-center gap-4 md:gap-6 p-4" onSubmit={handleLogin}>
                                     
                                     <div className="group">
                                         <label htmlFor="usernameOrEmail" className="block mb-1 text-sm font-bold text-[#FF6333FF] transition-colors duration-300 ease-[cubic-bezier(.25,.01,.25,1)] group-hover:text-[#ff3c00]">
@@ -245,7 +281,8 @@ function LoginForm() {
                                             label="Email"
                                             onChange={(e) => setEmail(e.target.value)}
                                             required
-                                            className="w-72 h-11 bg-white/5 rounded-lg px-4 border-2 border-transparent text-base text-[#FF6333FF] transition-[border-color,color,background] duration-300 ease-[cubic-bezier(.25,.01,.25,1)] hover:outline-none hover:border-[#ff3c00] focus:outline-none focus:border-[#ff3c00] group-hover:border-[#FF6333FF]"
+                                            disabled={isLoading}
+                                            className="w-72 h-11 bg-white/5 rounded-lg px-4 border-2 border-transparent text-base text-[#FF6333FF] transition-[border-color,color,background] duration-300 ease-[cubic-bezier(.25,.01,.25,1)] hover:outline-none hover:border-[#ff3c00] focus:outline-none focus:border-[#ff3c00] group-hover:border-[#FF6333FF] disabled:opacity-50"
                                         />
                                         <div></div>
                                     </div>
@@ -261,7 +298,8 @@ function LoginForm() {
                                                 value={password}
                                                 onChange={(e) => setPassword(e.target.value)}
                                                 required
-                                                className="w-72 h-11 bg-white/5 rounded-lg px-4 pr-12 border-2 border-transparent text-base text-[#FF6333FF] transition-[border-color,color,background] duration-300 hover:border-[#ff3c00] focus:outline-none focus:border-[#ff3c00] focus:ring-2 focus:ring-orange-500/50"
+                                                disabled={isLoading}
+                                                className="w-72 h-11 bg-white/5 rounded-lg px-4 pr-12 border-2 border-transparent text-base text-[#FF6333FF] transition-[border-color,color,background] duration-300 hover:border-[#ff3c00] focus:outline-none focus:border-[#ff3c00] focus:ring-2 focus:ring-orange-500/50 disabled:opacity-50"
                                             />
                                             <button
                                                 type="button"
@@ -283,12 +321,21 @@ function LoginForm() {
                                     </div>
                                     <button 
                                         type="submit" 
-                                        className="w-72 max-w-sm h-11 bg-gradient-to-r from-[#FF6333FF] to-[#DC2626FF] rounded-lg text-white font-semibold hover:opacity-90 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:ring-offset-black"
-                                        onClick={handleLogin}
+                                        disabled={isLoading}
+                                        className="w-72 max-w-sm h-11 bg-gradient-to-r from-[#FF6333FF] to-[#DC2626FF] rounded-lg text-white font-semibold hover:opacity-90 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:ring-offset-black disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                     >
-                                        Sign In
+                                        {isLoading ? (
+                                            <>
+                                                <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                </svg>
+                                                {successMessage || 'Signing In...'}
+                                            </>
+                                        ) : 'Sign In'}
                                     </button>
                                         {errorMessage && <p className="text-red-500 text-sm">{errorMessage}</p>}
+                                        {successMessage && <p className="text-green-500 text-sm">{successMessage}</p>}
                                 </form>
                                 <p className="text-neutral-300 text-sm">Don't remember your password? <span><a href="#" className="underline text-orange-500 hover:text-orange-400 cursor-pointer transition-colors">Reset it Here</a></span></p>
                             </section>
@@ -299,7 +346,7 @@ function LoginForm() {
                             <section className="text-white flex flex-col justify-center items-center w-full px-4">
                                 <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-[#FF7A00] via-[#FF3E1F] to-[#FF001F] bg-clip-text text-transparent">SIGN UP</h1>
 
-                                <form className="w-full h-full flex flex-col items-center gap-4 md:gap-6 p-4 md:p-8" action="">
+                                <form className="w-full h-full flex flex-col items-center gap-4 md:gap-6 p-4 md:p-8" onSubmit={handleSignUp}>
                                     
                                     <div className="group w-full max-w-sm">
                                         <label htmlFor="usernameOrEmail" className="block mb-1 text-sm font-bold text-[#FF6333FF] transition-colors duration-300 ease-[cubic-bezier(.25,.01,.25,1)] group-hover:text-[#ff3c00]">
@@ -429,11 +476,20 @@ function LoginForm() {
                                     
                                     <button 
                                         type="submit" 
-                                        onClick={handleSignUp}
-                                        className="w-full max-w-sm h-11 bg-gradient-to-r from-[#FF6333FF] to-[#DC2626FF] rounded-lg text-white font-semibold hover:opacity-90 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:ring-offset-black"
+                                        disabled={isLoading}
+                                        className="w-full max-w-sm h-11 bg-gradient-to-r from-[#FF6333FF] to-[#DC2626FF] rounded-lg text-white font-semibold hover:opacity-90 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:ring-offset-black disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                     >
-                                        Create Account
+                                        {isLoading ? (
+                                            <>
+                                                <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                </svg>
+                                                {successMessage || 'Creating Account...'}
+                                            </>
+                                        ) : 'Create Account'}
                                     </button>
+                                    {successMessage && <p className="text-green-500 text-sm mt-2">{successMessage}</p>}
                                 </form>
                             </section>        
                         </div>

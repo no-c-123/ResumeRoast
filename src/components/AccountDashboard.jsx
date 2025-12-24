@@ -4,13 +4,29 @@ import { authService } from '../services/supabase';
 import { logger } from '../lib/logger';
 import Loader from './uicomponents/Loader.jsx';
 import AnalysisResults from './AnalysisResults.jsx';
+import EmailConfirmationBanner from './uicomponents/EmailConfirmationBanner.jsx';
 import { useSubscription } from '../hooks/useSubscription';
 import { useRecentAnalyses } from '../hooks/useRecentAnalyses';
 import { useResumeAnalyzer } from '../hooks/useResumeAnalyzer';
 
 function AccountDashboard() {
     const { user: isLoggedIn, signOut } = useAuth();
+    const [mounted, setMounted] = useState(false);
     const [currentTab, setCurrentTab] = useState('resume');
+    const [changeEmail, setChangeEmail] = useState(false);
+    const [changePassword, setChangePassword] = useState(false);
+    
+    // Form States
+    const [newEmail, setNewEmail] = useState('');
+    const [passwordForm, setPasswordForm] = useState({
+        newPassword: '',
+        confirmPassword: ''
+    });
+    const [updateLoading, setUpdateLoading] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     // Hooks
     const { subscription, loading: subLoading } = useSubscription(isLoggedIn);
@@ -102,55 +118,246 @@ function AccountDashboard() {
             setCurrentTab('resume');
             await refetchHistory();
         } catch (err) {
-            // Error is already handled/logged in hook, but we can set local state if needed
-            // setLocalError(err.message); // Hook exposes 'error' state too
+            logger.error('Error analyzing resume:', err);
+            setLocalError(err.message || 'Failed to analyze resume');
         }
     };
 
-    const openFilePicker = () => {
-        setLocalError('');
-        fileInputRef.current?.click();
-    }
-
-    const onInputChange = (e) => {
-        const file = e.target.files?.[0];
-        validateAndSet(file);
-    }
-
-    const onDragOver = (e) => {
+    const handleChangeEmail = async (e) => {
         e.preventDefault();
-        e.stopPropagation();
+        setLocalError('');
+        setUpdateLoading(true);
+
+        try {
+            const { error } = await authService.updateEmail(newEmail);
+            if (error) throw error;
+            
+            setChangeEmail(false);
+            setNewEmail('');
+            alert('Confirmation link sent to your new email address.');
+        } catch (error) {
+            setLocalError(error.message);
+        } finally {
+            setUpdateLoading(false);
+        }
+    };
+
+    const handleChangePassword = async (e) => {
+        e.preventDefault();
+        setLocalError('');
+
+        if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+            setLocalError('Passwords do not match');
+            return;
+        }
+
+        if (passwordForm.newPassword.length < 6) {
+            setLocalError('Password must be at least 6 characters');
+            return;
+        }
+
+        setUpdateLoading(true);
+
+        try {
+            const { error } = await authService.updatePassword(passwordForm.newPassword);
+            if (error) throw error;
+
+            setChangePassword(false);
+            setPasswordForm({ newPassword: '', confirmPassword: '' });
+            alert('Password updated successfully');
+        } catch (error) {
+            setLocalError(error.message);
+        } finally {
+            setUpdateLoading(false);
+        }
+    };
+
+    const handleDragOver = (e) => {
+        e.preventDefault();
         setIsDragging(true);
     };
 
-    const onDragLeave = (e) => {
+    const handleDragLeave = (e) => {
         e.preventDefault();
-        e.stopPropagation();
         setIsDragging(false);
     };
 
-    const onDrop = (e) => {
+    const handleDrop = (e) => {
         e.preventDefault();
-        e.stopPropagation();
         setIsDragging(false);
-
-        const file = e.dataTransfer.files?.[0];
+        
+        const file = e.dataTransfer.files[0];
         validateAndSet(file);
-    }
-    
-    const displayError = localError || analyzeError;
+    };
+
     const isLoading = analyzing || historyLoading || subLoading;
+    const showContent = mounted && isLoggedIn;
 
     return (
-        <div className="min-h-screen w-full bg-black/10 flex items-center justify-center p-6">
+        <div className="min-h-screen w-full bg-black/10 flex flex-col items-center justify-start">
+            {/* Email Change Modal */}
+            <EmailConfirmationBanner />
+            {changeEmail && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+                    <div className="bg-neutral-900 border border-neutral-800 rounded-2xl w-full max-w-md p-6 shadow-2xl relative animate-fade-in">
+                        <button 
+                            onClick={() => {
+                                setChangeEmail(false);
+                                setLocalError('');
+                            }}
+                            className="absolute top-4 right-4 text-neutral-500 hover:text-white transition-colors"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+
+                        <h3 className="text-xl font-bold text-white mb-2">Change Email</h3>
+                        <p className="text-neutral-400 text-sm mb-6">Enter your new email address. We'll send you a confirmation link.</p>
+
+                        <form onSubmit={handleChangeEmail} className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-medium text-neutral-400 mb-1">New Email Address</label>
+                                <input
+                                    type="email"
+                                    value={newEmail}
+                                    onChange={(e) => setNewEmail(e.target.value)}
+                                    placeholder="new@email.com"
+                                    className="w-full bg-neutral-800/50 border border-neutral-700 rounded-xl px-4 py-3 text-white placeholder-neutral-600 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 transition-all"
+                                    required
+                                />
+                            </div>
+
+                            {localError && (
+                                <p className="text-red-500 text-xs bg-red-500/10 p-3 rounded-lg border border-red-500/20">
+                                    {localError}
+                                </p>
+                            )}
+
+                            <div className="flex gap-3 pt-2">
+                                <button 
+                                    type="button"
+                                    onClick={() => {
+                                        setChangeEmail(false);
+                                        setLocalError('');
+                                    }}
+                                    className="flex-1 py-3 bg-neutral-800 hover:bg-neutral-700 rounded-xl text-sm font-medium text-neutral-300 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    type="submit"
+                                    disabled={updateLoading}
+                                    className="flex-1 py-3 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                >
+                                    {updateLoading ? (
+                                        <>
+                                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                            Updating...
+                                        </>
+                                    ) : 'Update Email'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Password Change Modal */}
+            {changePassword && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+                    <div className="bg-neutral-900 border border-neutral-800 rounded-2xl w-full max-w-md p-6 shadow-2xl relative animate-fade-in">
+                        <button 
+                            onClick={() => {
+                                setChangePassword(false);
+                                setLocalError('');
+                                setPasswordForm({ newPassword: '', confirmPassword: '' });
+                            }}
+                            className="absolute top-4 right-4 text-neutral-500 hover:text-white transition-colors"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+
+                        <h3 className="text-xl font-bold text-white mb-2">Change Password</h3>
+                        <p className="text-neutral-400 text-sm mb-6">Choose a strong password to keep your account secure.</p>
+
+                        <form onSubmit={handleChangePassword} className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-medium text-neutral-400 mb-1">New Password</label>
+                                <input
+                                    type="password"
+                                    value={passwordForm.newPassword}
+                                    onChange={(e) => setPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
+                                    placeholder="••••••••"
+                                    className="w-full bg-neutral-800/50 border border-neutral-700 rounded-xl px-4 py-3 text-white placeholder-neutral-600 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 transition-all"
+                                    required
+                                    minLength={6}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-neutral-400 mb-1">Confirm Password</label>
+                                <input
+                                    type="password"
+                                    value={passwordForm.confirmPassword}
+                                    onChange={(e) => setPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                                    placeholder="••••••••"
+                                    className="w-full bg-neutral-800/50 border border-neutral-700 rounded-xl px-4 py-3 text-white placeholder-neutral-600 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 transition-all"
+                                    required
+                                    minLength={6}
+                                />
+                            </div>
+
+                            {localError && (
+                                <p className="text-red-500 text-xs bg-red-500/10 p-3 rounded-lg border border-red-500/20">
+                                    {localError}
+                                </p>
+                            )}
+
+                            <div className="flex gap-3 pt-2">
+                                <button on 
+                                            nClick={() => setChagePassword(true)}
+                                           
+                                        
+                                    type="button"
+                                    onClick={() => {
+                                        setChangePassword(false);
+                                        setLocalError('');
+                                        setPasswordForm({ newPassword: '', confirmPassword: '' });
+                                    }}
+                                    className="flex-1 py-3 bg-neutral-800 hover:bg-neutral-700 rounded-xl text-sm font-medium text-neutral-300 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    type="submit"
+                                    disabled={updateLoading}
+                                    className="flex-1 py-3 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                >
+                                    {updateLoading ? (
+                                        <>
+                                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                            Updating...
+                                        </>
+                                    ) : 'Update Password'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+            
+            <div className="flex items-center justify-center p-6 w-full flex-1">
             {/* Main Container */}
             <div className="max-w-7xl w-full flex gap-6">
                 
                 {/* Left Column - Profile & Transactions */}
                 <aside className="flex flex-col gap-6 w-80">
                     {/* Profile Box */}
+
                     <div className="bg-black/5 backdrop-blur-2xl rounded-2xl border border-white/20 p-6">
-                        {isLoggedIn ? (
+                        {showContent ? (
                             <div className='flex flex-col items-center'>
                                 <div className='relative mb-4'>
                                     <img className='rounded-full w-24 h-24' src="/user_img.png" alt="Profile" />
@@ -186,10 +393,18 @@ function AccountDashboard() {
                                             <div className='flex-1 min-w-0'>
                                                 <label className='text-neutral-400 font-light text-xs'>Email</label>
                                                 <p className='text-neutral-200 text-sm truncate'>{isLoggedIn.email}</p>
+                                                {isLoggedIn.new_email && (
+                                                    <p className='text-orange-500 text-xs mt-1 truncate flex items-center gap-1'>
+                                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-3 h-3">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                                                        </svg>
+                                                        Pending: {isLoggedIn.new_email}
+                                                    </p>
+                                                )}
                                             </div>
                                         </div>
                                         <button 
-                                            onClick={() => alert('Email change coming soon!')}
+                                            onClick={() => setChangeEmail(true)}
                                             className='text-neutral-300 text-xs transition-all duration-300 hover:text-orange-500 cursor-pointer ml-8'
                                         >
                                             Change Email
@@ -207,7 +422,10 @@ function AccountDashboard() {
                                                 <p className='text-neutral-200 text-sm'>••••••••••••</p>
                                             </div>
                                         </div>
-                                        <button className='text-neutral-300 text-xs hover:text-orange-500 transition-colors cursor-pointer ml-8'>
+                                        <button 
+                                            onClick={() => setChangePassword(true)}
+                                            className='text-neutral-300 text-xs hover:text-orange-500 transition-colors cursor-pointer ml-8'
+                                        >
                                             Change Password
                                         </button>
                                     </div>
@@ -342,7 +560,7 @@ function AccountDashboard() {
                     {/* Quick Actions */}
                     <div className='flex gap-3 mb-6'>
                         <a
-                            href='/resume-builder'
+                            href='/resume-builder?mode=build'
                             className='flex-1 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 rounded-xl p-4 transition-all flex items-center gap-3 text-white font-medium'
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
@@ -573,8 +791,8 @@ function AccountDashboard() {
                                         </button>
 
                                         {deleteModal && (
-                                            <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-                                                <div className="bg-neutral-900/90 rounded-xl p-6 w-96 border border-red-500/30">
+                                            <div className="absolute inset-0 bg-black/70 flex items-center justify-center z-50">
+                                                <div className="bg-neutral-900/90 rounded-xl p-6 w-96 border border-red-500">
                                                     <h3 className="text-xl font-bold mb-4 text-red-500">Confirm Account Deletion</h3>
                                                     <p className="text-sm text-neutral-400 mb-6">
                                                         Are you sure you want to delete your account? This action is irreversible and will remove all your data.
@@ -601,6 +819,7 @@ function AccountDashboard() {
                     )}
                 </div>
             </div>
+        </div>
         </div>
         </div>
     )

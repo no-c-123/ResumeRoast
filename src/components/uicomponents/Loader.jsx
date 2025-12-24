@@ -3,7 +3,7 @@ import React from 'react';
 const Loader = () => {
   return (
     <>
-      <style jsx>{`
+      <style>{`
         @keyframes text_713 {
           0% {
             letter-spacing: 1px;

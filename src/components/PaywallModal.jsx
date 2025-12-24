@@ -111,13 +111,24 @@ const ProductDisplay = ({ initialTab }) => {
 
 const SuccessDisplay = ({ sessionId }) => {
   const handlePortal = async () => {
+    // Get current user session
+    const { authService } = await import('../services/supabase');
+    const session = await authService.getSession();
+
     const response = await fetch('/api/create-portal-session', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ session_id: sessionId }),
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': session ? `Bearer ${session.access_token}` : ''
+      },
+      body: JSON.stringify({}),
     });
     const data = await response.json();
-    window.location = data.url;
+    if (data.url) {
+        window.location = data.url;
+    } else {
+        alert('Error redirecting to portal: ' + (data.error || 'Unknown error'));
+    }
   };
 
   return (

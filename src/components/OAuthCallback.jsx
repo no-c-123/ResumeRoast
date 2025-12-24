@@ -20,11 +20,8 @@ function OAuthCallback() {
 
     // Decision logic based on profile existence
     if (profile) {
-        window.location.href = '/dashboard';
+        window.location.href = '/';
     } else {
-        // If user exists but no profile, they might be new
-        // or the profile creation webhook hasn't fired yet.
-        // Safer to send to onboarding or dashboard to handle it.
         window.location.href = '/resume-builder?new=true';
     }
   }, [user, profile, loading]);

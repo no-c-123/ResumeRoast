@@ -20,15 +20,20 @@ const supabase = createClient(
 
 export async function POST({ request }) {
     try {
-        const formData = await request.formData();
-        
-        // Zod validation
-        const rawData = {
-            resumeText: formData.get('resumeText'),
-            jobDescription: formData.get('jobDescription'),
-            originalSuggestions: JSON.parse(formData.get('originalSuggestions') || '{}'),
-        };
+        const contentType = request.headers.get('content-type') || '';
+        let rawData;
 
+        if (contentType.includes('application/json')) {
+            rawData = await request.json();
+        } else {
+            const formData = await request.formData();
+            rawData = {
+                resumeText: formData.get('resumeText'),
+                jobDescription: formData.get('jobDescription'),
+                originalSuggestions: JSON.parse(formData.get('originalSuggestions') || '{}'),
+            };
+        }
+        
         const validation = TailorSchema.safeParse(rawData);
 
         if (!validation.success) {
@@ -42,7 +47,7 @@ export async function POST({ request }) {
             });
         }
 
-        const { resumeText, jobDescription } = validation.data;
+        const { resumeText, jobDescription, resumeData: providedResumeData } = validation.data;
 
         const authHeader = request.headers.get('Authorization');
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -54,6 +59,18 @@ export async function POST({ request }) {
                 headers: { 'Content-Type': 'application/json' }
             });
         }
+
+        const supabase = createClient(
+            import.meta.env.PUBLIC_SUPABASE_URL,
+            import.meta.env.PUBLIC_SUPABASE_ANON_KEY,
+            {
+              global: {
+                headers: {
+                  Authorization: authHeader
+                }
+              }
+            }
+        );
 
         const sessionToken = authHeader.replace('Bearer ', '');
         const { data: { user }, error: authError } = await supabase.auth.getUser(sessionToken);
@@ -100,29 +117,68 @@ export async function POST({ request }) {
             });
         }
 
-        const parsedResume = parseResumeTextToStructuredData(resumeText);
-        
-        const { data: profileData } = await supabase
-            .from('user_profiles')
-            .select('*')
-            .eq('user_id', user.id)
-            .maybeSingle();
+        let resumeData = providedResumeData;
 
-        const resumeData = {
-            profile: {
-                full_name: parsedResume.profile.full_name || profileData?.full_name || '',
-                professional_summary: parsedResume.profile.professional_summary || profileData?.professional_summary || '',
-                email: parsedResume.profile.email || profileData?.email || user.email,
-                phone: parsedResume.profile.phone || profileData?.phone || '',
-                location: parsedResume.profile.location || profileData?.location || '',
-                linkedin: parsedResume.profile.linkedin || profileData?.linkedin || '',
-                skills: parsedResume.profile.skills || profileData?.skills || '',
-                volunteering: parsedResume.profile.volunteering || profileData?.volunteering || ''
-            },
-            work_experience: parsedResume.work_experience.length > 0 ? parsedResume.work_experience : (profileData?.work_experience || []),
-            education: parsedResume.education.length > 0 ? parsedResume.education : (profileData?.education || []),
-            projects: profileData?.projects || []
-        };
+        if (!resumeData && resumeText) {
+             const parsedResume = parseResumeTextToStructuredData(resumeText);
+             const { data: profileData } = await supabase
+                .from('user_profiles')
+                .select('*')
+                .eq('user_id', user.id)
+                .maybeSingle();
+
+             resumeData = {
+                profile: {
+                    full_name: parsedResume.profile.full_name || profileData?.full_name || '',
+                    professional_summary: parsedResume.profile.professional_summary || profileData?.professional_summary || '',
+                    email: parsedResume.profile.email || profileData?.email || user.email,
+                    phone: parsedResume.profile.phone || profileData?.phone || '',
+                    location: parsedResume.profile.location || profileData?.location || '',
+                    linkedin: parsedResume.profile.linkedin || profileData?.linkedin || '',
+                    skills: parsedResume.profile.skills || profileData?.skills || '',
+                    volunteering: parsedResume.profile.volunteering || profileData?.volunteering || ''
+                },
+                work_experience: parsedResume.work_experience.length > 0 ? parsedResume.work_experience : (profileData?.work_experience || []),
+                education: parsedResume.education.length > 0 ? parsedResume.education : (profileData?.education || []),
+                projects: profileData?.projects || []
+            };
+        } else if (!resumeData) {
+            // Fallback to profile data if no resumeText and no resumeData provided (though schema validation might catch this if strict)
+            // But since both are optional now, we need to handle this case
+            const { data: profileData } = await supabase
+                .from('user_profiles')
+                .select('*')
+                .eq('user_id', user.id)
+                .maybeSingle();
+            
+            if (profileData) {
+                 resumeData = {
+                    profile: {
+                        full_name: profileData.full_name || '',
+                        professional_summary: profileData.professional_summary || '',
+                        email: profileData.email || user.email,
+                        phone: profileData.phone || '',
+                        location: profileData.location || '',
+                        linkedin: profileData.linkedin || '',
+                        skills: profileData.skills || '',
+                        volunteering: profileData.volunteering || ''
+                    },
+                    work_experience: profileData.work_experience || [],
+                    education: profileData.education || [],
+                    projects: profileData.projects || []
+                 };
+            }
+        }
+
+        if (!resumeData) {
+             return new Response(JSON.stringify({
+                success: false,
+                error: 'No resume data found to tailor.'
+            }), {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
 
         const message = await anthropic.messages.create({
             model: "claude-sonnet-4-20250514",

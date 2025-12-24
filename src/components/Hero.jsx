@@ -5,278 +5,143 @@ import { logger } from '../lib/logger';
 
 function Hero() {
 
-    const fileInputRef = useRef(null);
-    const [isDragging, setIsDragging] = useState(false);
-    const [selectedFile, setSelectedFile] = useState(null);
-    const [careerLevel, setCareerLevel] = useState('professional');
-    const [error, setError] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
-
-    const MAX_BYTES = 5 * 1024 * 1024; // 5MB
-    const ACCEPTED = [
-        'application/pdf',
-        'application/msword',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    ];
-
-    const validateAndSet = async (file) => {
-        setError('');
-        if (!file) return;
-        
-        const typeOk = !file.type || ACCEPTED.includes(file.type);
-        if (!typeOk) {
-            setError('Unsupported file type. Please upload a PDF or Word document.');
-            return;
-        }
-
-        if (file.size > MAX_BYTES) {
-            setError('File size exceeds 5MB limit. Please upload a smaller file.');
-            return;
-        }
-        
-        setIsLoading(true);
-        setSelectedFile(file);
-        
-        try {
-            await setFile('pendingAnalysisFile', file);
-            
-            // Store metadata in sessionStorage
-            sessionStorage.setItem('pendingAnalysisMeta', JSON.stringify({
-                fileName: file.name,
-                careerLevel: careerLevel
-            }));
-            
-            // Navigate to analyzing page
-            window.location.href = '/analyzing';
-        } catch (err) {
-            logger.error('Error saving file:', err);
-            setError('Failed to process file. Please try again.');
-            setIsLoading(false);
-        }
-    };
-
-    const openFilePicker = () => {
-        setError('');
-        fileInputRef.current?.click();
-    }
-
-    const onInputChange = (e) => {
-        const file = e.target.files?.[0];
-        validateAndSet(file);
-    }
-
-    const onDragOver = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setIsDragging(true);
-    };
-
-    const onDragLeave = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setIsDragging(false);
-    };
-
-    const onDrop = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setIsDragging(false);
-
-        const file = e.dataTransfer.files?.[0];
-        validateAndSet(file);
-    }
+    // Career level selection moved to /analyzing page as requested
 
     return (
         <div className="flex flex-col justify-center items-center min-h-screen overflow-x-hidden px-4 md:px-10 lg:px-20 pt-20 pb-10">
-            <section className="flex flex-col items-center justify-center w-full">
-                <h1 className="bg-gradient-to-r from-[#FF7A00] via-[#FF3E1F] to-[#FF001F] bg-clip-text text-transparent text-4xl md:text-6xl lg:text-8xl font-extrabold mb-4 md:mb-6 text-center">
+            <section className="flex flex-col items-center justify-center w-full mb-16">
+                <h1 className="bg-gradient-to-r from-[#FF7A00] via-[#FF3E1F] to-[#FF001F] bg-clip-text text-transparent text-4xl md:text-6xl lg:text-7xl font-extrabold mb-4 text-center leading-tight">
                     Your Resume Sucks.
                 </h1>
-                <h1 className="bg-gradient-to-r from-[#FF7A00] via-[#FF3E1F] to-[#FF001F] bg-clip-text text-transparent text-4xl md:text-6xl lg:text-8xl font-extrabold mb-6 md:mb-8 text-center">
+                <h1 className="bg-gradient-to-r from-[#FF7A00] via-[#FF3E1F] to-[#FF001F] bg-clip-text text-transparent text-4xl md:text-6xl lg:text-7xl font-extrabold mb-8 text-center leading-tight">
                     Let's Fix It.
                 </h1>
 
-                {/* Career Level Selection */}
-                <div className="w-full max-w-6xl mb-6">
-                    <label className="block text-white text-sm font-medium mb-3 text-center">
-                        Select your career level for tailored feedback:
-                    </label>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <button
-                            onClick={() => setCareerLevel('intern')}
-                            className={`p-4 rounded-xl border-2 transition-all ${
-                                careerLevel === 'intern'
-                                    ? 'border-orange-500 bg-orange-500/20'
-                                    : 'border-white/20 bg-white/5 hover:border-orange-500/50'
-                            }`}
-                        >
-                            <div className="text-2xl mb-2">🎓</div>
-                            <h3 className="text-white font-bold mb-1">Intern</h3>
-                            <p className="text-white/60 text-xs">Entry-level, internship, or first job</p>
-                        </button>
-                        <button
-                            onClick={() => setCareerLevel('new_grad')}
-                            className={`p-4 rounded-xl border-2 transition-all ${
-                                careerLevel === 'new_grad'
-                                    ? 'border-orange-500 bg-orange-500/20'
-                                    : 'border-white/20 bg-white/5 hover:border-orange-500/50'
-                            }`}
-                        >
-                            <div className="text-2xl mb-2">🎓</div>
-                            <h3 className="text-white font-bold mb-1">New Grad</h3>
-                            <p className="text-white/60 text-xs">Recent graduate, 0-2 years experience</p>
-                        </button>
-                        <button
-                            onClick={() => setCareerLevel('professional')}
-                            className={`p-4 rounded-xl border-2 transition-all ${
-                                careerLevel === 'professional'
-                                    ? 'border-orange-500 bg-orange-500/20'
-                                    : 'border-white/20 bg-white/5 hover:border-orange-500/50'
-                            }`}
-                        >
-                            <div className="text-2xl mb-2">💼</div>
-                            <h3 className="text-white font-bold mb-1">Professional</h3>
-                            <p className="text-white/60 text-xs">2+ years of experience</p>
-                        </button>
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-6xl mb-4">
-                    {/* Upload Resume Box */}
-                    <div 
-                        className={`relative flex flex-col justify-center items-center min-h-[400px] border-4 border-dashed rounded-xl p-8 transition-all duration-300 cursor-pointer 
-                            ${isDragging
-                                ? 'bg-white/10 border-orange-500/80' 
-                                : 'border-white/20 hover:border-orange-500/50 bg-white/5 hover:bg-white/10' 
-                            }`}
-
-                        onClick={openFilePicker}
-                        onDragOver={onDragOver}
-                        onDragLeave={onDragLeave}
-                        onDrop={onDrop}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ')
-                                openFilePicker();
-                        }}
-                    >
+                {/* Features Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full max-w-7xl">
                     
-                        <img src="/logo-orange.png" alt="logo-orange" className="w-20 h-20 mb-4"/>
-                        
-                        <p className="text-white font-bold text-2xl font-outfit mb-3 text-center">
-                            Upload Your Resume
-                        </p>
-
-                        <p className="text-white/60 text-base font-outfit mb-4 text-center px-4">
-                            Drag & drop your file here
-                        </p>
-
-                        <p className="text-white/40 text-lg font-outfit mb-6"> 
-                            or 
-                        </p>
-                        
-                        <button
-                            type="button"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                openFilePicker();
-                            }}
-                            className="w-44 h-11 text-sm bg-gradient-to-r from-[#FF6333FF] to-[#DC2626FF] rounded-2xl hover:opacity-90 duration-300 flex justify-center items-center text-white font-medium mb-5"
-                        >
-                            <img 
-                                src="Upload-Icon.svg" 
-                                alt="upload-svg" 
-                                className="w-5 h-5 mr-3 brightness-0 invert"
-                            />
-                            Browse Files
-                        </button>
-                        
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          className="hidden"
-                          accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                          onChange={onInputChange}
-                        />
-
-                        <p className="text-white/40 text-sm font-outfit text-center px-2">
-                            Accepted: PDF, DOC, DOCX • Max 5MB
-                        </p>
-                        
-                        {selectedFile && (
-                            <p className="text-green-400 text-sm font-outfit pt-2 text-center px-2">
-                                ✓ {selectedFile.name}
-                            </p>
-                        )}
-                        {error && (
-                            <p className="text-red-500 text-sm font-outfit pt-2 text-center px-2">{error}</p>
-                        )}
-                    </div>
-
-                    {/* Build Resume Box */}
-                    <a
-                        href="/resume-builder"
-                        className="relative flex flex-col justify-center items-center min-h-[400px] border-4 border-dashed rounded-xl border-white/20 hover:border-orange-500/50 bg-white/5 hover:bg-white/10 p-8 transition-all duration-300 cursor-pointer group"
+                    {/* 1. Upload & Analyze */}
+                    <a 
+                        href="/analyzing"
+                        className="group flex flex-col p-8 rounded-2xl bg-neutral-900/50 border border-white/10 hover:border-orange-500/50 hover:bg-neutral-800/80 hover:shadow-lg transition-all duration-300"
                     >
-                        <div className="w-20 h-20 bg-orange-500/20 rounded-full flex items-center justify-center mb-4 group-hover:bg-orange-500/30 transition-colors">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-12 h-12 text-orange-500">
+                        <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="white" className="w-6 h-6">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5m-9 0h18" />
+                            </svg>
+                        </div>
+                        
+                        <h3 className="text-2xl font-bold text-white mb-2 group-hover:text-orange-500 transition-colors">
+                            Upload & Analyze
+                        </h3>
+                        <p className="text-neutral-400 text-sm mb-6 flex-grow">
+                            Get instant AI feedback on your existing resume. We support PDF and DOCX.
+                        </p>
+
+                        <div className="flex items-center text-orange-500 font-medium text-sm group-hover:translate-x-2 transition-transform">
+                            Go to Analyzer 
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 ml-2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                            </svg>
+                        </div>
+                    </a>
+
+                    {/* 2. Build from Scratch */}
+                    <a href="/resume-builder?mode=build" className="group flex flex-col p-8 rounded-2xl bg-neutral-900/50 border border-white/10 hover:border-orange-500/50 hover:bg-neutral-800/80 transition-all duration-300 hover:shadow-lg">
+                        <div className="w-12 h-12 bg-neutral-800 rounded-xl flex items-center justify-center mb-6 group-hover:bg-neutral-700 transition-colors border border-white/5">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6 text-orange-500">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                             </svg>
                         </div>
-
-                        <p className="text-white font-bold text-2xl font-outfit mb-3 text-center">
-                            Build From Scratch
+                        <h3 className="text-2xl font-bold text-white mb-2 group-hover:text-orange-500 transition-colors">
+                            Build from Scratch
+                        </h3>
+                        <p className="text-neutral-400 text-sm mb-6 flex-grow">
+                            Create a professional resume step-by-step with our guided builder.
                         </p>
+                        <div className="flex items-center text-orange-500 font-medium text-sm group-hover:translate-x-2 transition-transform">
+                            Start Building
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 ml-2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                            </svg>
+                        </div>
+                    </a>
 
-                        <p className="text-white/60 text-base font-outfit mb-6 text-center px-4 max-w-sm">
-                            Create your resume step-by-step with our guided builder
-                        </p>
-
-                        <button
-                            type="button"
-                            className="w-44 h-11 text-sm bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl hover:opacity-90 duration-300 flex justify-center items-center text-white font-medium mb-5"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 mr-3">
+                    {/* 3. Generate Cover Letter */}
+                    <a href="/cover-letter" className="group flex flex-col p-8 rounded-2xl bg-neutral-900/50 border border-white/10 hover:border-orange-500/50 hover:bg-neutral-800/80 transition-all duration-300 hover:shadow-lg">
+                        <div className="w-12 h-12 bg-neutral-800 rounded-xl flex items-center justify-center mb-6 group-hover:bg-neutral-700 transition-colors border border-white/5">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6 text-orange-500">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
                             </svg>
-                            Get Started
-                        </button>
-
-                        <p className="text-white/40 text-sm font-outfit text-center px-2">
-                            Perfect for first-time job seekers
+                        </div>
+                        <h3 className="text-2xl font-bold text-white mb-2 group-hover:text-orange-500 transition-colors">
+                            Cover Letter
+                        </h3>
+                        <p className="text-neutral-400 text-sm mb-6 flex-grow">
+                            Generate a tailored cover letter based on your resume and job description.
                         </p>
+                        <div className="flex items-center text-orange-500 font-medium text-sm group-hover:translate-x-2 transition-transform">
+                            Write Now
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 ml-2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                            </svg>
+                        </div>
                     </a>
-                </div>
 
-                <p className="text-white/40 text-sm text-center mb-6">
-                    Choose how you want to start building your perfect resume
-                </p>
-            </section>
+                    {/* 4. Resume Scorer */}
+                    <a href="/resume-scorer" className="group flex flex-col p-8 rounded-2xl bg-neutral-900/50 border border-white/10 hover:border-orange-500/50 hover:bg-neutral-800/80 transition-all duration-300 hover:shadow-lg">
+                        <div className="w-12 h-12 bg-neutral-800 rounded-xl flex items-center justify-center mb-6 group-hover:bg-neutral-700 transition-colors border border-white/5">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6 text-orange-500">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+                            </svg>
+                        </div>
+                        <h3 className="text-xl font-bold text-white mb-2 group-hover:text-orange-500 transition-colors">
+                            Resume Scorer
+                        </h3>
+                        <p className="text-neutral-400 text-sm mb-6 flex-grow">
+                            See how well your resume matches a specific job description with AI scoring.
+                        </p>
+                        <div className="flex items-center text-neutral-500 font-medium text-sm group-hover:text-orange-500 transition-colors">
+                            Check Score
+                        </div>
+                    </a>
 
-            <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 pt-8 md:pt-10 w-full max-w-7xl">
-                <div className="w-full h-auto md:h-44 bg-white/5 border-2 border-white/10 hover:border-white/20 rounded-lg p-4 md:p-6 flex flex-col justify-start items-start transition-all duration-300">
-                    <div className="flex flex-row justify-center items-center gap-2">
-                        <img src="clipboard.png" alt="clipboard" />
-                        <p className="text-white font-semibold">ATS Match Score</p>
-                    </div>
-                    <p className="text-neutral-300 pt-3 font-normal">Optimize your resume to pass Applicant Tracking Systems with flying colors, ensuring recruiters see your potential.</p>
-                </div>
+                    {/* 5. Manage Versions */}
+                    <a href="/versions" className="group flex flex-col p-8 rounded-2xl bg-neutral-900/50 border border-white/10 hover:border-orange-500/50 hover:bg-neutral-800/80 transition-all duration-300 hover:shadow-lg">
+                        <div className="w-12 h-12 bg-neutral-800 rounded-xl flex items-center justify-center mb-6 group-hover:bg-neutral-700 transition-colors border border-white/5">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6 text-orange-500">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 8.25V6a2.25 2.25 0 00-2.25-2.25H6A2.25 2.25 0 003.75 6v8.25A2.25 2.25 0 006 16.5h2.25m8.25-8.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-7.5A2.25 2.25 0 018.25 18v-1.5m8.25-8.25h-6a2.25 2.25 0 00-2.25 2.25v6" />
+                            </svg>
+                        </div>
+                        <h3 className="text-xl font-bold text-white mb-2 group-hover:text-orange-500 transition-colors">
+                            Manage Versions
+                        </h3>
+                        <p className="text-neutral-400 text-sm mb-6 flex-grow">
+                            Create multiple versions of your resume for different roles (e.g. Frontend vs Fullstack).
+                        </p>
+                        <div className="flex items-center text-neutral-500 font-medium text-sm group-hover:text-orange-500 transition-colors">
+                            Manage Versions
+                        </div>
+                    </a>
 
-                <div className="w-full h-auto md:h-44 bg-white/5 border-2 border-white/10 hover:border-white/20 rounded-lg p-4 md:p-6 flex flex-col justify-start items-start transition-all duration-300">
-                    <div className="flex flex-row justify-center items-center gap-2">
-                        <img src="clipboard.png" alt="clipboard" />
-                        <p className="text-white font-semibold">Formatting Feedback</p>
-                    </div>
-                    <p className="text-neutral-300 pt-3 font-normal">Receive expert advice on layout, readability, and visual appeal to make your resume stand out in a pile.</p>
-                </div>
+                    {/* 6. Tailor for Jobs */}
+                    <a href="/tailor" className="group flex flex-col p-8 rounded-2xl bg-neutral-900/50 border border-white/10 hover:border-orange-500/50 hover:bg-neutral-800/80 transition-all duration-300 hover:shadow-lg">
+                        <div className="w-12 h-12 bg-neutral-800 rounded-xl flex items-center justify-center mb-6 group-hover:bg-neutral-700 transition-colors border border-white/5">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6 text-orange-500">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+                            </svg>
+                        </div>
+                        <h3 className="text-xl font-bold text-white mb-2 group-hover:text-orange-500 transition-colors">
+                            Tailor for Jobs
+                        </h3>
+                        <p className="text-neutral-400 text-sm mb-6 flex-grow">
+                            Quickly optimize your resume keywords for a specific job description.
+                        </p>
+                        <div className="flex items-center text-neutral-500 font-medium text-sm group-hover:text-orange-500 transition-colors">
+                            Optimize Now
+                        </div>
+                    </a>
 
-                <div className="w-full h-auto md:h-44 bg-white/5 border-2 border-white/10 hover:border-white/20 rounded-lg p-4 md:p-6 flex flex-col justify-start items-start transition-all duration-300">
-                    <div className="flex flex-row justify-center items-center gap-2">
-                        <img src="clipboard.png" alt="clipboard" />
-                        <p className="text-white font-semibold">Keyword Optimization</p>
-                    </div>
-                    <p className="text-neutral-300 pt-3 font-normal">Identify and integrate high-impact keywords to align perfectly with job descriptions and industry standards.</p>
                 </div>
             </section>
         </div>

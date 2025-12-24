@@ -5,6 +5,6 @@ import AnalyzingPage from '../components/AnalyzingPage.jsx';
 export const prerender = false;
 ---
 
-<Layout title="Analyzing Your Resume - Resume Roast">
-    <AnalyzingPage client:load />
+<Layout title="Analyzing Resume | ResumeRoast">
+    <AnalyzingPage client:only="react" />
 </Layout>

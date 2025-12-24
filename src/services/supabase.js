@@ -35,7 +35,9 @@ export const authService = {
 
   async signInWithPassword(credentials) {
     try {
+        logger.log('authService: calling supabase.auth.signInWithPassword');
         const { data, error } = await supabase.auth.signInWithPassword(credentials);
+        logger.log('authService: supabase.auth.signInWithPassword returned', { error: !!error, user: !!data?.user });
         if (error) throw error;
         return { data, error: null };
     } catch (error) {
@@ -63,6 +65,28 @@ export const authService = {
     } catch (error) {
         logger.error('Error signing up:', error);
         return { data: null, error };
+    }
+  },
+
+  async updateEmail(email) {
+    try {
+      const { data, error } = await supabase.auth.updateUser({ email });
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      logger.error('Error updating email:', error);
+      return { data: null, error };
+    }
+  },
+
+  async updatePassword(password) {
+    try {
+      const { data, error } = await supabase.auth.updateUser({ password });
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      logger.error('Error updating password:', error);
+      return { data: null, error };
     }
   },
 
@@ -166,6 +190,22 @@ export const dbService = {
       return data;
     } catch (error) {
       logger.error('Error upserting profile:', error);
+      throw error;
+    }
+  },
+
+  async submitTestimonial(testimonialData) {
+    try {
+      const { data, error } = await supabase
+        .from('testimonials')
+        .insert([testimonialData])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      logger.error('Error submitting testimonial:', error);
       throw error;
     }
   }

@@ -13,11 +13,6 @@ const anthropic = new Anthropic({
   apiKey: import.meta.env.ANTHROPIC_API_KEY
 });
 
-const supabase = createClient(
-  import.meta.env.PUBLIC_SUPABASE_URL,
-  import.meta.env.PUBLIC_SUPABASE_ANON_KEY
-);
-
 export async function POST({ request }) {
   try {
     const authHeader = request.headers.get('Authorization');
@@ -27,6 +22,19 @@ export async function POST({ request }) {
         headers: { 'Content-Type': 'application/json' }
       });
     }
+
+    const supabase = createClient(
+      import.meta.env.PUBLIC_SUPABASE_URL,
+      import.meta.env.PUBLIC_SUPABASE_ANON_KEY,
+      {
+        global: {
+          headers: {
+            Authorization: authHeader
+          }
+        }
+      }
+    );
+
     const sessionToken = authHeader.replace('Bearer ', '');
 
     const rawBody = await request.json();
@@ -36,7 +44,7 @@ export async function POST({ request }) {
       return new Response(JSON.stringify({ error: 'Invalid input', details: result.error.format() }), { status: 400 });
     }
 
-    const { userId, resumeText, resumeData, analysisId } = result.data;
+    const { userId, resumeText, resumeData, analysisId, customInstructions } = result.data;
 
     if (!checkRateLimit(userId)) {
       return new Response(JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }), {
@@ -131,6 +139,10 @@ Action Items: ${actionItems.map(item => item.task).join('; ')}`;
       }
     }
 
+    if (customInstructions) {
+        analysisContext += `\n\nSPECIFIC USER INSTRUCTIONS:\n${customInstructions}`;
+    }
+
     const message = await anthropic.messages.create({
       model: "claude-sonnet-4-20250514",
       max_tokens: 4000,
@@ -151,9 +163,13 @@ INSTRUCTIONS:
    - Add quantifiable achievements where possible (if none exist, suggest measurable impacts)
    - Make language professional and avoid informal tone
    - Split long descriptions into clear, impactful bullet points (use "|" as separator between bullets)
-3. **Skills**: Organize skills professionally, remove redundancies, add missing relevant skills if appropriate
-4. **Education**: Ensure all fields are complete and professionally formatted
-5. **Overall**: Fix grammar, spelling, formatting issues, and ensure professional tone throughout
+3. **Projects**: 
+   - Rewrite project descriptions to be impactful and technical
+   - Highlight technologies used
+   - Quantify impact if possible
+4. **Skills**: Organize skills professionally, remove redundancies, add missing relevant skills if appropriate
+5. **Education**: Ensure all fields are complete and professionally formatted
+6. **Overall**: Fix grammar, spelling, formatting issues, and ensure professional tone throughout
 
 IMPORTANT RULES:
 - Keep the person's actual experience and facts - don't make up fake accomplishments
@@ -181,6 +197,14 @@ Return the improved resume in this exact JSON format:
       "start_date": "string",
       "end_date": "string",
       "description": "string (use | to separate bullet points)"
+    }
+  ],
+  "projects": [
+    {
+      "title": "string",
+      "link": "string",
+      "description": "string",
+      "tech": "string"
     }
   ],
   "education": [

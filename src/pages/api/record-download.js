@@ -1,11 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
+import { logger } from '../../lib/logger';
 
 export const prerender = false;
-
-const supabase = createClient(
-  import.meta.env.PUBLIC_SUPABASE_URL,
-  import.meta.env.PUBLIC_SUPABASE_ANON_KEY
-);
 
 export async function POST({ request }) {
   try {
@@ -16,6 +12,18 @@ export async function POST({ request }) {
         headers: { 'Content-Type': 'application/json' }
       });
     }
+
+    const supabase = createClient(
+      import.meta.env.PUBLIC_SUPABASE_URL,
+      import.meta.env.PUBLIC_SUPABASE_ANON_KEY,
+      {
+        global: {
+          headers: {
+            Authorization: authHeader
+          }
+        }
+      }
+    );
 
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
@@ -38,7 +46,7 @@ export async function POST({ request }) {
       });
 
     if (error) {
-      console.error('Error recording download:', error);
+      logger.error('Error recording download:', error);
       return new Response(
         JSON.stringify({ error: 'Failed to record download' }),
         { status: 500, headers: { 'Content-Type': 'application/json' } }
@@ -50,7 +58,7 @@ export async function POST({ request }) {
       { status: 200, headers: { 'Content-Type': 'application/json' } }
     );
   } catch (err) {
-    console.error('Error in record-download API:', err);
+    logger.error('Error in record-download API:', err);
     return new Response(
       JSON.stringify({ error: 'Internal server error' }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }

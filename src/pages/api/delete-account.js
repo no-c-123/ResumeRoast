@@ -1,4 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
+import { supabaseAdmin } from '../../lib/supabaseAdmin';
+import { logger } from '../../lib/logger';
 
 export const prerender = false;
 
@@ -30,28 +32,11 @@ export async function DELETE({ request }) {
             );
         }
 
-        // Create admin client to delete user
-        const supabaseServiceKey = import.meta.env.SUPABASE_SERVICE_ROLE_KEY;
-        if (!supabaseServiceKey) {
-            console.error('SUPABASE_SERVICE_ROLE_KEY not configured');
-            return new Response(
-                JSON.stringify({ error: 'Server configuration error' }),
-                { status: 500, headers: { 'Content-Type': 'application/json' } }
-            );
-        }
-
-        const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-            auth: {
-                autoRefreshToken: false,
-                persistSession: false
-            }
-        });
-
         // Delete the user (this will cascade delete related data due to foreign keys)
         const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(user.id);
 
         if (deleteError) {
-            console.error('Error deleting user:', deleteError);
+            logger.error('Error deleting user:', deleteError);
             return new Response(
                 JSON.stringify({ error: 'Failed to delete account' }),
                 { status: 500, headers: { 'Content-Type': 'application/json' } }
@@ -64,7 +49,7 @@ export async function DELETE({ request }) {
         );
 
     } catch (error) {
-        console.error('Delete account error:', error);
+        logger.error('Delete account error:', error);
         return new Response(
             JSON.stringify({ error: 'Internal server error' }),
             { status: 500, headers: { 'Content-Type': 'application/json' } }

@@ -1,11 +1,24 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { authService } from '../services/supabase';
-import { getFile, removeFile } from '../lib/storage';
+import { getFile, setFile, removeFile } from '../lib/storage';
 import { logger } from '../lib/logger';
+import Loader from './uicomponents/Loader.jsx';
 
 function AnalyzingPage() {
     const [currentStep, setCurrentStep] = useState(0);
     const [progress, setProgress] = useState(0);
+    const [phase, setPhase] = useState('upload'); // 'upload' | 'analyzing'
+    const [careerLevel, setCareerLevel] = useState('professional');
+    const [fileError, setFileError] = useState('');
+    const fileInputRef = useRef(null);
+    const [isDragging, setIsDragging] = useState(false);
+
+    const MAX_BYTES = 5 * 1024 * 1024; // 5MB
+    const ACCEPTED = [
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ];
 
     const analysisSteps = [
         {
@@ -51,28 +64,81 @@ function AnalyzingPage() {
     ];
 
     useEffect(() => {
-        analyzeResume();
+        // Check if a file is already pending (from legacy flow or reloads)
+        const checkPending = async () => {
+             const metaData = sessionStorage.getItem('pendingAnalysisMeta');
+             if (metaData) {
+                 setPhase('analyzing');
+                 analyzeResume();
+             }
+        };
+        checkPending();
     }, []);
 
     useEffect(() => {
-        // Simulate progress through steps
-        const interval = setInterval(() => {
-            setProgress((prev) => {
-                if (prev >= 100) return 100;
-                return prev + 1;
-            });
-        }, 100);
-
-        return () => clearInterval(interval);
-    }, []);
-
-    useEffect(() => {
-        // Update current step based on progress
-        const stepIndex = Math.floor((progress / 100) * analysisSteps.length);
-        if (stepIndex < analysisSteps.length) {
-            setCurrentStep(stepIndex);
+        if (phase === 'analyzing') {
+            // Simulate progress through steps
+            const interval = setInterval(() => {
+                setProgress((prev) => {
+                    if (prev >= 100) return 100;
+                    return prev + 1;
+                });
+            }, 100);
+            return () => clearInterval(interval);
         }
-    }, [progress]);
+    }, [phase]);
+
+    useEffect(() => {
+        if (phase === 'analyzing') {
+            // Update current step based on progress
+            const stepIndex = Math.floor((progress / 100) * analysisSteps.length);
+            if (stepIndex < analysisSteps.length) {
+                setCurrentStep(stepIndex);
+            }
+        }
+    }, [progress, phase]);
+
+    // --- Upload Logic ---
+
+    const handleFileSelect = async (file) => {
+        setFileError('');
+        if (!file) return;
+
+        const typeOk = !file.type || ACCEPTED.includes(file.type);
+        if (!typeOk) {
+            setFileError('Unsupported file type. Please upload a PDF or Word document.');
+            return;
+        }
+
+        if (file.size > MAX_BYTES) {
+            setFileError('File size exceeds 5MB limit. Please upload a smaller file.');
+            return;
+        }
+
+        try {
+            await setFile('pendingAnalysisFile', file);
+            sessionStorage.setItem('pendingAnalysisMeta', JSON.stringify({
+                fileName: file.name,
+                careerLevel: careerLevel
+            }));
+            setPhase('analyzing');
+            analyzeResume();
+        } catch (err) {
+            logger.error('Error saving file:', err);
+            setFileError('Failed to process file. Please try again.');
+        }
+    };
+
+    const onDragOver = (e) => { e.preventDefault(); setIsDragging(true); };
+    const onDragLeave = (e) => { e.preventDefault(); setIsDragging(false); };
+    const onDrop = (e) => {
+        e.preventDefault();
+        setIsDragging(false);
+        const file = e.dataTransfer.files?.[0];
+        handleFileSelect(file);
+    };
+
+    // --- Analysis Logic ---
 
     const analyzeResume = async () => {
         try {
@@ -82,15 +148,15 @@ function AnalyzingPage() {
             // Backward compatibility for existing sessionStorage
             const oldFileData = sessionStorage.getItem('pendingAnalysis');
             
-            let file, careerLevel;
+            let file, level;
             
             if (metaData) {
                 const meta = JSON.parse(metaData);
-                careerLevel = meta.careerLevel;
+                level = meta.careerLevel;
                 file = await getFile('pendingAnalysisFile');
             } else if (oldFileData) {
                  const data = JSON.parse(oldFileData);
-                 careerLevel = data.careerLevel;
+                 level = data.careerLevel;
                  const byteCharacters = atob(data.fileContent);
                  const byteNumbers = new Array(byteCharacters.length);
                  for (let i = 0; i < byteCharacters.length; i++) {
@@ -102,7 +168,7 @@ function AnalyzingPage() {
             }
 
             if (!file) {
-                window.location.href = '/';
+                setPhase('upload'); // Go back to upload if no file found
                 return;
             }
 
@@ -124,7 +190,7 @@ function AnalyzingPage() {
             const formData = new FormData();
             formData.append('file', file);
             formData.append('userId', session.user.id);
-            formData.append('careerLevel', careerLevel || 'professional');
+            formData.append('careerLevel', level || 'professional');
 
             // Call the analysis API
             const response = await fetch('/api/analyze-resume', {
@@ -163,14 +229,88 @@ function AnalyzingPage() {
             // Don't redirect immediately - show the error on the page
             setCurrentStep(-1); // Use -1 to indicate error state
             alert(`Failed to analyze resume: ${error.message}\n\nCheck the browser console and terminal for more details.`);
-            // Allow user to go back manually
-            setTimeout(() => {
-                if (confirm('Go back to homepage?')) {
-                    window.location.href = '/';
-                }
-            }, 500);
+            setPhase('upload'); // Let them try again
         }
     };
+
+    if (phase === 'upload') {
+        return (
+            <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center px-4 py-20 relative overflow-hidden">
+                <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-20 pointer-events-none"></div>
+                <div className="max-w-4xl w-full text-center z-10">
+                    <div className="mb-12">
+                        <div className="w-24 h-24 mx-auto bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center mb-6 shadow-2xl shadow-orange-500/20">
+                            <span className="text-5xl">🔥</span>
+                        </div>
+                        <h1 className="text-5xl md:text-7xl font-black mb-4 bg-gradient-to-r from-white to-neutral-400 bg-clip-text text-transparent">
+                            Ready for the Truth?
+                        </h1>
+                        <p className="text-xl text-neutral-400 max-w-2xl mx-auto">
+                            Upload your resume and discover what's <span className="text-orange-500 font-bold">really</span> holding you back.
+                        </p>
+                    </div>
+
+                    {/* Career Level Selection */}
+                    <div className="mb-8">
+                        <label className="block text-neutral-400 text-sm font-medium mb-4">
+                            Select your career level:
+                        </label>
+                        <div className="flex justify-center gap-4 flex-wrap">
+                            {['intern', 'new_grad', 'professional'].map((level) => (
+                                <button
+                                    key={level}
+                                    onClick={() => setCareerLevel(level)}
+                                    className={`px-6 py-3 rounded-xl border transition-all duration-300 flex items-center gap-2 ${
+                                        careerLevel === level
+                                            ? 'border-orange-500 bg-orange-500/10 shadow-[0_0_15px_rgba(255,122,0,0.2)] text-white'
+                                            : 'border-white/10 bg-white/5 hover:border-orange-500/50 hover:bg-white/10 text-neutral-400'
+                                    }`}
+                                >
+                                    <span>{level === 'intern' ? '🎓' : level === 'new_grad' ? '🚀' : '💼'}</span>
+                                    <span className="capitalize">{level.replace('_', ' ')}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div
+                        className={`
+                            relative max-w-2xl mx-auto h-[350px] border-4 border-dashed rounded-3xl flex flex-col items-center justify-center transition-all cursor-pointer group
+                            ${isDragging 
+                                ? 'border-orange-500 bg-orange-500/10 scale-105 shadow-[0_0_50px_rgba(249,115,22,0.3)]' 
+                                : 'border-neutral-700 bg-neutral-900/50 hover:border-orange-500/50 hover:bg-neutral-900'
+                            }
+                        `}
+                        onDragOver={onDragOver}
+                        onDragLeave={onDragLeave}
+                        onDrop={onDrop}
+                        onClick={() => fileInputRef.current?.click()}
+                    >
+                        <div className="text-center space-y-4 pointer-events-none">
+                            <div className={`text-6xl transition-transform duration-300 ${isDragging ? 'scale-125' : 'group-hover:scale-110'}`}>
+                                📄
+                            </div>
+                            <h3 className="text-2xl font-bold text-white">
+                                {isDragging ? "Drop it like it's hot! 🔥" : "Drop Your Resume Here"}
+                            </h3>
+                            <p className="text-neutral-400">PDF, DOCX supported (Max 5MB)</p>
+                            {fileError && <p className="text-red-500 font-bold">{fileError}</p>}
+                            <button className="px-6 py-2 bg-white text-black font-bold rounded-full mt-4 hover:bg-neutral-200 transition-colors pointer-events-auto">
+                                Browse Files
+                            </button>
+                        </div>
+                        <input 
+                            type="file" 
+                            ref={fileInputRef} 
+                            className="hidden" 
+                            accept=".pdf,.doc,.docx"
+                            onChange={(e) => handleFileSelect(e.target.files?.[0])}
+                        />
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-black text-white flex items-center justify-center px-4 py-20">

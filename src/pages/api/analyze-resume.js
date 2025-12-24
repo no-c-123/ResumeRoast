@@ -394,7 +394,13 @@ Format your response as valid JSON with this exact structure:
         file_name: file.name,
         analysis_text: message.content[0].text,
         ats_score: analysis.ats_score,
-        suggestions: analysis,
+        suggestions: {
+            ...analysis,
+            stats: {
+                word_count: resumeText.split(/\s+/).length,
+                bullet_count: (resumeText.match(/•|·|-|\*/g) || []).length
+            }
+        },
         career_level: careerLevel,
         created_at: new Date().toISOString()
       })

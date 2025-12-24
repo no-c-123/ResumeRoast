@@ -1,0 +1,81 @@
+---
+import { getCollection } from 'astro:content';
+import type { CollectionEntry } from 'astro:content';
+import Layout from '../../layouts/Layout.astro';
+
+export async function getStaticPaths() {
+  const posts = await getCollection('blog');
+  return posts.map((post: CollectionEntry<'blog'>) => ({
+    params: { slug: post.slug },
+    props: { post },
+  }));
+}
+
+type Props = {
+  post: CollectionEntry<'blog'>;
+};
+
+const { post } = Astro.props;
+const { Content } = await post.render();
+
+const formatDate = (date: Date) => {
+  try {
+    return new Date(date).toLocaleDateString('en-US', {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric'
+    });
+  } catch (e) {
+    return '';
+  }
+};
+---
+
+<Layout>
+  <div class="min-h-screen bg-black text-white pt-24 pb-12">
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+      
+      <!-- Article Header -->
+      <div class="mb-12 text-center">
+        <div class="flex items-center justify-center gap-4 text-sm text-neutral-500 mb-6">
+          <span class="text-orange-500 font-medium">{post.data.category}</span>
+          <span>•</span>
+          <span>{formatDate(post.data.date)}</span>
+          <span>•</span>
+          <span>{post.data.readTime}</span>
+        </div>
+        <h1 class="text-4xl md:text-5xl font-bold mb-6 leading-tight">
+          {post.data.title}
+        </h1>
+        <p class="text-xl text-neutral-400 leading-relaxed">
+          {post.data.excerpt}
+        </p>
+        <div class="mt-8 flex items-center justify-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center text-white font-bold">
+            {post.data.author[0]}
+          </div>
+          <div class="text-left">
+            <p class="text-white font-medium text-sm">{post.data.author}</p>
+            <p class="text-neutral-500 text-xs">Author</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Article Content -->
+      <article class="prose prose-invert prose-orange max-w-none prose-lg prose-headings:font-bold prose-headings:text-white prose-p:text-neutral-300 prose-li:text-neutral-300 prose-strong:text-white">
+        <Content />
+      </article>
+
+      <!-- Share/Footer -->
+      <div class="mt-16 pt-8 border-t border-white/10 flex justify-between items-center">
+        <a href="/blog" class="text-neutral-400 hover:text-white transition-colors flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+          </svg>
+          Back to Blog
+        </a>
+      </div>
+
+    </div>
+  </div>
+</Layout>

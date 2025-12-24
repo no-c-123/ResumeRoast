@@ -1,0 +1,8 @@
+---
+import Layout from '../layouts/Layout.astro';
+import CoverLetterGenerator from '../components/CoverLetterGenerator.jsx';
+---
+
+<Layout title="Generate Cover Letter | ResumeRoast">
+    <CoverLetterGenerator client:only="react" />
+</Layout>

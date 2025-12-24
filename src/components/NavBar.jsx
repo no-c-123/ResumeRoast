@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import { logger } from '../lib/logger';
 
@@ -9,12 +8,15 @@ export default function NavBar() {
     const [currentPath, setCurrentPath] = useState('');
     const [scrolled, setScrolled] = useState(false);
     const [initials, setInitials] = useState('');
+    const [mounted, setMounted] = useState(false);
     
     // Backward compatibility for existing JSX
-    const isLoggedIn = user;
+    // Ensure we only show logged-in state after hydration (mount) to match server HTML
+    const isLoggedIn = mounted && user;
     const setIsLoggedIn = () => {};
 
     useEffect(() => {
+        setMounted(true);
         const handleScroll = () => {
             const isScrolled = window.scrollY > 10;
             setScrolled(isScrolled);
