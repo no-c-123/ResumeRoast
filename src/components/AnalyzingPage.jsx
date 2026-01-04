@@ -12,6 +12,10 @@ function AnalyzingPage() {
     const [fileError, setFileError] = useState('');
     const fileInputRef = useRef(null);
     const [isDragging, setIsDragging] = useState(false);
+    
+    // Resume Selection
+    const [resumes, setResumes] = useState([]);
+    const [showResumeSelector, setShowResumeSelector] = useState(false);
 
     const MAX_BYTES = 5 * 1024 * 1024; // 5MB
     const ACCEPTED = [
@@ -64,15 +68,34 @@ function AnalyzingPage() {
     ];
 
     useEffect(() => {
-        // Check if a file is already pending (from legacy flow or reloads)
-        const checkPending = async () => {
-             const metaData = sessionStorage.getItem('pendingAnalysisMeta');
-             if (metaData) {
-                 setPhase('analyzing');
-                 analyzeResume();
-             }
+        // Fetch resumes for selection
+        const loadResumes = async () => {
+            const session = await authService.getSession();
+            if (session?.user) {
+                const data = await dbService.getResumes(session.user.id);
+                setResumes(data || []);
+            }
         };
-        checkPending();
+        loadResumes();
+
+        const params = new URLSearchParams(window.location.search);
+        const rId = params.get('resumeId');
+        
+        if (rId) {
+            setPhase('analyzing');
+            // Small delay to allow UI to render 'analyzing' state
+            setTimeout(() => analyzeResume(rId), 100);
+        } else {
+            // Check if a file is already pending (from legacy flow or reloads)
+            const checkPending = async () => {
+                 const metaData = sessionStorage.getItem('pendingAnalysisMeta');
+                 if (metaData) {
+                     setPhase('analyzing');
+                     analyzeResume();
+                 }
+            };
+            checkPending();
+        }
     }, []);
 
     useEffect(() => {
@@ -139,48 +162,52 @@ function AnalyzingPage() {
     };
 
     // --- Analysis Logic ---
-
-    const analyzeResume = async () => {
+    const analyzeResume = async (resumeIdParam) => {
         try {
-            // Get the uploaded file from IndexedDB
-            const metaData = sessionStorage.getItem('pendingAnalysisMeta');
-            
-            // Backward compatibility for existing sessionStorage
-            const oldFileData = sessionStorage.getItem('pendingAnalysis');
-            
             let file, level;
             
-            if (metaData) {
-                const meta = JSON.parse(metaData);
-                level = meta.careerLevel;
-                file = await getFile('pendingAnalysisFile');
-            } else if (oldFileData) {
-                 const data = JSON.parse(oldFileData);
-                 level = data.careerLevel;
-                 const byteCharacters = atob(data.fileContent);
-                 const byteNumbers = new Array(byteCharacters.length);
-                 for (let i = 0; i < byteCharacters.length; i++) {
-                     byteNumbers[i] = byteCharacters.charCodeAt(i);
-                 }
-                 const byteArray = new Uint8Array(byteNumbers);
-                 const blob = new Blob([byteArray]);
-                 file = new File([blob], data.fileName, { type: 'application/pdf' });
-            }
+            if (!resumeIdParam) {
+                // Get the uploaded file from IndexedDB
+                const metaData = sessionStorage.getItem('pendingAnalysisMeta');
+                
+                // Backward compatibility for existing sessionStorage
+                const oldFileData = sessionStorage.getItem('pendingAnalysis');
+                
+                if (metaData) {
+                    const meta = JSON.parse(metaData);
+                    level = meta.careerLevel;
+                    file = await getFile('pendingAnalysisFile');
+                } else if (oldFileData) {
+                     const data = JSON.parse(oldFileData);
+                     level = data.careerLevel;
+                     const byteCharacters = atob(data.fileContent);
+                     const byteNumbers = new Array(byteCharacters.length);
+                     for (let i = 0; i < byteCharacters.length; i++) {
+                         byteNumbers[i] = byteCharacters.charCodeAt(i);
+                     }
+                     const byteArray = new Uint8Array(byteNumbers);
+                     const blob = new Blob([byteArray]);
+                     file = new File([blob], data.fileName, { type: 'application/pdf' });
+                }
 
-            if (!file) {
-                setPhase('upload'); // Go back to upload if no file found
-                return;
+                if (!file) {
+                    setPhase('upload'); // Go back to upload if no file found
+                    return;
+                }
             }
 
             // Get current user session
             const session = await authService.getSession();
             if (!session) {
                 // Cleanup
-                if (metaData) {
-                    await removeFile('pendingAnalysisFile');
-                    sessionStorage.removeItem('pendingAnalysisMeta');
-                } else {
-                    sessionStorage.removeItem('pendingAnalysis');
+                if (!resumeIdParam) {
+                    const metaData = sessionStorage.getItem('pendingAnalysisMeta');
+                    if (metaData) {
+                        await removeFile('pendingAnalysisFile');
+                        sessionStorage.removeItem('pendingAnalysisMeta');
+                    } else {
+                        sessionStorage.removeItem('pendingAnalysis');
+                    }
                 }
                 window.location.href = '/login';
                 return;
@@ -188,9 +215,14 @@ function AnalyzingPage() {
 
             // Create FormData for API request
             const formData = new FormData();
-            formData.append('file', file);
+            if (resumeIdParam) {
+                formData.append('resumeId', resumeIdParam);
+            } else if (file) {
+                formData.append('file', file);
+            }
+            
             formData.append('userId', session.user.id);
-            formData.append('careerLevel', level || 'professional');
+            formData.append('careerLevel', level || careerLevel || 'professional');
 
             // Call the analysis API
             const response = await fetch('/api/analyze-resume', {
@@ -214,11 +246,14 @@ function AnalyzingPage() {
             }
 
             // Clean up storage
-            if (metaData) {
-                await removeFile('pendingAnalysisFile');
-                sessionStorage.removeItem('pendingAnalysisMeta');
-            } else {
-                sessionStorage.removeItem('pendingAnalysis');
+            if (!resumeIdParam) {
+                const metaData = sessionStorage.getItem('pendingAnalysisMeta');
+                if (metaData) {
+                    await removeFile('pendingAnalysisFile');
+                    sessionStorage.removeItem('pendingAnalysisMeta');
+                } else {
+                    sessionStorage.removeItem('pendingAnalysis');
+                }
             }
 
             // Redirect to results page
@@ -307,6 +342,54 @@ function AnalyzingPage() {
                             onChange={(e) => handleFileSelect(e.target.files?.[0])}
                         />
                     </div>
+
+                    {resumes.length > 0 && (
+                         <div className="mt-6 text-center">
+                            <button 
+                                onClick={() => setShowResumeSelector(true)}
+                                className="text-neutral-500 hover:text-orange-500 transition-colors text-sm font-medium flex items-center justify-center gap-2 mx-auto"
+                            >
+                                <span className="text-lg">📂</span>
+                                Select from your uploaded resumes
+                            </button>
+                        </div>
+                    )}
+
+                    {showResumeSelector && (
+                        <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setShowResumeSelector(false)}>
+                            <div className="bg-[#1a1a1a] border border-orange-500/30 rounded-2xl p-6 max-w-lg w-full max-h-[80vh] overflow-y-auto shadow-2xl animate-in fade-in zoom-in duration-200" onClick={e => e.stopPropagation()}>
+                                <div className="flex justify-between items-center mb-6">
+                                    <h3 className="text-xl font-bold text-white">Select Resume to Analyze</h3>
+                                    <button onClick={() => setShowResumeSelector(false)} className="text-neutral-400 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors">✕</button>
+                                </div>
+                                
+                                <div className="space-y-3">
+                                    {resumes.map(resume => (
+                                        <div 
+                                            key={resume.id} 
+                                            onClick={() => {
+                                                setPhase('analyzing');
+                                                analyzeResume(resume.id);
+                                            }}
+                                            className="flex items-center gap-4 p-4 rounded-xl border border-neutral-800 bg-[#151515] hover:border-orange-500 hover:bg-orange-500/10 cursor-pointer transition-all group"
+                                        >
+                                            <div className="w-10 h-10 rounded-full bg-neutral-800 flex items-center justify-center text-lg group-hover:bg-orange-500 group-hover:text-white transition-colors">
+                                                📄
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="font-bold text-white truncate">{resume.title || 'Untitled Resume'}</div>
+                                                <div className="text-xs text-neutral-500 flex items-center gap-2">
+                                                    <span>{new Date(resume.updated_at).toLocaleDateString()}</span>
+                                                    {resume.is_active && <span className="text-[10px] bg-green-500/20 text-green-500 px-1.5 py-0.5 rounded border border-green-500/20">Active</span>}
+                                                </div>
+                                            </div>
+                                            <div className="text-neutral-500 group-hover:text-orange-500">→</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         );

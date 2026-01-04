@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
-import { authService, dbService } from '../services/supabase';
-import { logger } from '../lib/logger';
 import Loader from './uicomponents/Loader';
+import { renderTemplate } from './ResumeTemplates.jsx';
+import { generateResumePDF } from '../lib/pdfGenerator';
+import { useResumeAnalysis } from '../hooks/useResumeAnalysis';
 
 // --- Sub-components for Results Dashboard ---
 
@@ -105,14 +106,24 @@ const IssueCard = ({ type, title, children, expanded, onToggle }) => {
 
 export default function ResumeAnalyzer({ initialAnalysisId }) {
     const { user } = useAuth();
-    const [phase, setPhase] = useState(initialAnalysisId ? 3 : 1);
-    const [file, setFile] = useState(null);
+    const {
+        phase, setPhase,
+        file,
+        loadingMessage,
+        analysisData,
+        fixing,
+        fixedData,
+        isDownloading, setIsDownloading,
+        startAnalysis,
+        handleApplyFix,
+        fetchAnalysis
+    } = useResumeAnalysis(initialAnalysisId, user);
+
     const [isDragging, setIsDragging] = useState(false);
-    const [processingStep, setProcessingStep] = useState(0);
-    const [loadingMessage, setLoadingMessage] = useState("Reading your resume...");
-    const [analysisData, setAnalysisData] = useState(null);
     const [activeTab, setActiveTab] = useState('critical');
     const [expandedIssues, setExpandedIssues] = useState({});
+    const [selectedTemplate, setSelectedTemplate] = useState('ivy');
+    const [zoom, setZoom] = useState(50);
     const fileInputRef = useRef(null);
 
     // Load existing analysis if provided
@@ -120,26 +131,12 @@ export default function ResumeAnalyzer({ initialAnalysisId }) {
         if (initialAnalysisId && user) {
             fetchAnalysis(initialAnalysisId);
         }
-    }, [initialAnalysisId, user]);
-
-    const fetchAnalysis = async (id) => {
-        try {
-            const data = await dbService.getAnalysis(id, user.id);
-            if (data) {
-                setAnalysisData(processAnalysisData(data));
-                setPhase(3);
-            }
-        } catch (err) {
-            console.error(err);
-        }
-    };
+    }, [initialAnalysisId, user, fetchAnalysis]);
 
     // --- Phase 1: Upload Handlers ---
 
     const handleFileSelect = (selectedFile) => {
         if (!selectedFile) return;
-        // Validate type/size here if needed
-        setFile(selectedFile);
         startAnalysis(selectedFile);
     };
 
@@ -152,137 +149,27 @@ export default function ResumeAnalyzer({ initialAnalysisId }) {
         handleFileSelect(droppedFile);
     };
 
-    // --- Phase 2: Processing & API ---
-
-    const startAnalysis = async (resumeFile) => {
-        setPhase(2);
-        
-        // Entertaining Loading Sequence
-        const messages = [
-            "Scanning for buzzwords...",
-            "Checking if you're actually a 'self-starter'...",
-            "Analyzing formatting... That font is interesting...",
-            "Counting how many times you said 'synergy'...",
-            "Checking ATS compatibility...",
-            "Measuring impact... This might hurt...",
-            "Preparing the roast..."
-        ];
-
-        let msgIndex = 0;
-        const msgInterval = setInterval(() => {
-            setLoadingMessage(messages[msgIndex]);
-            msgIndex = (msgIndex + 1) % messages.length;
-        }, 2000);
-
-        // API Call
-        try {
-            const session = await authService.getSession();
-            if (!session) {
-                // Handle auth redirect or error
-                alert("Please log in to analyze your resume");
-                window.location.href = '/login';
-                return;
-            }
-
-            const formData = new FormData();
-            formData.append('file', resumeFile);
-            formData.append('userId', session.user.id);
-            formData.append('careerLevel', 'professional'); // Default or let user pick
-
-            const response = await fetch('/api/analyze-resume', {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${session.access_token}` },
-                body: formData
-            });
-
-            const result = await response.json();
-            
-            clearInterval(msgInterval);
-
-            if (!response.ok) throw new Error(result.error);
-
-            // Process Data
-            const processed = processAnalysisData(result.analysis);
-            setAnalysisData(processed);
-            
-            // Artificial delay to finish animations
-            setTimeout(() => setPhase(3), 1000);
-
-        } catch (error) {
-            clearInterval(msgInterval);
-            logger.error(error);
-            alert("Analysis failed: " + error.message);
-            setPhase(1);
-        }
-    };
-
-    // Transform API response to our Dashboard structure
-    const processAnalysisData = (data) => {
-        const suggestions = data.suggestions || {};
-        const checklist = suggestions.checklist_results || {};
-        
-        // Categorize issues
-        const critical = suggestions.critical_issues?.map(issue => ({
-            type: 'critical',
-            title: issue, // API returns strings, we might need to map to structured objects if possible
-            description: "This is a critical issue identified by our AI.",
-            fix: "Review the section mentioned and apply best practices.",
-            impact: "+15 points",
-            time: "10 mins"
-        })) || [];
-
-        // Map checklist failures to warnings/critical
-        const warnings = [];
-        const wins = [];
-
-        Object.values(checklist).flat().forEach(item => {
-            if (item.status === 'FAIL') {
-                warnings.push({
-                    type: 'warning',
-                    title: item.item,
-                    description: item.feedback,
-                    fix: "Follow the suggestion to improve this area.",
-                    impact: "+5 points",
-                    time: "5 mins"
-                });
-            } else if (item.status === 'PASS') {
-                wins.push({
-                    type: 'win',
-                    title: item.item,
-                    description: item.feedback,
-                    impact: "Maintained",
-                    time: "0 mins"
-                });
-            }
-        });
-
-        // Opportunities from action items
-        const opportunities = suggestions.action_items?.map(item => ({
-            type: 'opportunity',
-            title: item.task,
-            description: "Growth opportunity to stand out.",
-            fix: "Implement this action item.",
-            impact: "+10 points",
-            time: "15 mins"
-        })) || [];
-
-        return {
-            score: suggestions.ats_score || 0,
-            summary: suggestions.overall_assessment,
-            critical,
-            warnings,
-            wins,
-            opportunities,
-            stats: {
-                words: data.stats?.word_count || "500+", 
-                bullets: data.stats?.bullet_count || "20+",
-                issues: critical.length + warnings.length
-            }
-        };
-    };
-
     const toggleIssue = (id) => {
         setExpandedIssues(prev => ({ ...prev, [id]: !prev[id] }));
+    };
+
+    const handleDownload = async () => {
+        if (!fixedData) return;
+        setIsDownloading(true);
+        try {
+            generateResumePDF(
+                fixedData.profile,
+                fixedData.work_experience || [],
+                fixedData.education || [],
+                fixedData.projects || [],
+                selectedTemplate
+            );
+        } catch (error) {
+            console.error("PDF generation failed", error);
+            alert("Failed to generate PDF");
+        } finally {
+            setIsDownloading(false);
+        }
     };
 
     // --- Render ---
@@ -290,6 +177,38 @@ export default function ResumeAnalyzer({ initialAnalysisId }) {
     return (
         <div className="min-h-screen bg-black text-white font-sans selection:bg-orange-500/30">
             
+            {phase === 1 && (
+                <div className="flex flex-col items-center justify-center min-h-screen p-4">
+                    <div 
+                        className={`w-full max-w-xl p-12 rounded-2xl border-2 border-dashed transition-all cursor-pointer
+                            ${isDragging ? 'border-orange-500 bg-orange-500/10' : 'border-neutral-800 hover:border-neutral-600 bg-[#111]'}
+                        `}
+                        onDragOver={onDragOver}
+                        onDragLeave={onDragLeave}
+                        onDrop={onDrop}
+                        onClick={() => fileInputRef.current?.click()}
+                    >
+                        <input 
+                            type="file" 
+                            ref={fileInputRef}
+                            className="hidden" 
+                            accept=".pdf,.doc,.docx"
+                            onChange={(e) => handleFileSelect(e.target.files?.[0])}
+                        />
+                        <div className="text-center">
+                            <h2 className="text-2xl font-bold mb-4">Drop your resume here</h2>
+                            <p className="text-neutral-400">or click to browse (PDF, DOCX)</p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {phase === 2 && (
+                <div className="flex flex-col items-center justify-center min-h-screen">
+                    <Loader text={loadingMessage} />
+                </div>
+            )}
+
             {/* PHASE 3: DASHBOARD */}
             {phase === 3 && analysisData && (
                 <div className="min-h-screen bg-[#0a0a0a] pb-20">
@@ -410,8 +329,12 @@ export default function ResumeAnalyzer({ initialAnalysisId }) {
                                                     <span className="text-xs font-bold text-neutral-500 uppercase">Time</span>
                                                     <span className="text-white font-bold">{issue.time}</span>
                                                 </div>
-                                                <button className="w-full mt-4 py-2 bg-white text-black font-bold text-sm rounded hover:bg-neutral-200 transition-colors">
-                                                    Apply Auto-Fix
+                                                <button 
+                                                    onClick={() => handleApplyFix('critical', `Fix this critical issue: ${issue.title} - ${issue.description}. ${issue.fix}`)}
+                                                    disabled={fixing !== null}
+                                                    className="w-full mt-4 py-2 bg-white text-black font-bold text-sm rounded hover:bg-neutral-200 transition-colors disabled:opacity-50"
+                                                >
+                                                    {fixing === 'critical' ? 'Applying...' : 'Apply Auto-Fix'}
                                                 </button>
                                             </div>
                                         </div>
@@ -466,6 +389,46 @@ export default function ResumeAnalyzer({ initialAnalysisId }) {
                                     </div>
                                 )}
                             </div>
+
+                            {/* Improved Resume Preview (If Fix Applied) */}
+                            {fixedData && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 30 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="border-t border-neutral-800 pt-12 mt-12"
+                                    id="improved-resume-preview"
+                                >
+                                    <div className="flex items-center justify-between mb-6">
+                                        <h3 className="text-2xl font-bold text-white">✨ Improved Resume Preview</h3>
+                                        <button 
+                                            onClick={handleDownload}
+                                            disabled={isDownloading}
+                                            className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-600 rounded-lg font-bold text-white shadow-lg hover:shadow-green-500/20 transition-all disabled:opacity-50"
+                                        >
+                                            {isDownloading ? 'Generating PDF...' : 'Download Improved PDF'}
+                                        </button>
+                                    </div>
+
+                                    <div className="bg-white text-black p-8 rounded-xl shadow-2xl relative overflow-hidden min-h-[600px]">
+                                        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-green-400 to-blue-500"></div>
+                                        
+                                        {/* Resume Content */}
+                                        <div className="max-w-4xl mx-auto space-y-6">
+                                            {renderTemplate({
+                                                selectedTemplate: 'ivy',
+                                                templates: [{ id: 'ivy', name: 'Ivy League', font: 'Times New Roman, serif', color: '#000000' }],
+                                                profile: fixedData.profile || {},
+                                                hasWorkExperience: (fixedData.work_experience || []).length > 0,
+                                                workExperience: fixedData.work_experience || [],
+                                                hasEducation: (fixedData.education || []).length > 0,
+                                                education: fixedData.education || [],
+                                                hasProjects: (fixedData.projects || []).length > 0,
+                                                projects: fixedData.projects || []
+                                            })}
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            )}
                         </div>
                     </div>
                 </div>

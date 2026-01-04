@@ -208,5 +208,86 @@ export const dbService = {
       logger.error('Error submitting testimonial:', error);
       throw error;
     }
+  },
+
+  // Resume Management
+  async getResumes(userId) {
+    try {
+      const { data, error } = await supabase
+        .from('resumes')
+        .select('*')
+        .eq('user_id', userId)
+        .order('updated_at', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      logger.error('Error fetching resumes:', error);
+      return [];
+    }
+  },
+
+  async getResume(resumeId) {
+    try {
+      const { data, error } = await supabase
+        .from('resumes')
+        .select('*')
+        .eq('id', resumeId)
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      logger.error('Error fetching resume:', error);
+      return null;
+    }
+  },
+
+  async createResume(resumeData) {
+    try {
+      const { data, error } = await supabase
+        .from('resumes')
+        .insert([resumeData])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      logger.error('Error creating resume:', error);
+      throw error;
+    }
+  },
+
+  async updateResume(resumeId, updates) {
+    try {
+      const { data, error } = await supabase
+        .from('resumes')
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq('id', resumeId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      logger.error('Error updating resume:', error);
+      throw error;
+    }
+  },
+
+  async deleteResume(resumeId) {
+    try {
+      const { error } = await supabase
+        .from('resumes')
+        .delete()
+        .eq('id', resumeId);
+
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      logger.error('Error deleting resume:', error);
+      throw error;
+    }
   }
 };

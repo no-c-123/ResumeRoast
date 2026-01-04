@@ -29,9 +29,34 @@ function AccountDashboard() {
     }, []);
 
     // Hooks
-    const { subscription, loading: subLoading } = useSubscription(isLoggedIn);
+    const { subscription, loading: subLoading, refetch: refetchSubscription } = useSubscription(isLoggedIn);
     const { analyses: recentAnalyses, stats, loading: historyLoading, refetch: refetchHistory } = useRecentAnalyses(isLoggedIn);
     const { analyzeResume, analyzing, error: analyzeError } = useResumeAnalyzer();
+
+    // Poll for subscription update on success return
+    useEffect(() => {
+        if (typeof window !== 'undefined' && isLoggedIn) {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('success') === 'true') {
+                const interval = setInterval(() => {
+                    refetchSubscription();
+                }, 2000);
+
+                // Stop polling after 15 seconds
+                const timeout = setTimeout(() => {
+                    clearInterval(interval);
+                    // Remove success param to clean up URL
+                    const newUrl = window.location.pathname;
+                    window.history.replaceState({}, '', newUrl);
+                }, 15000);
+
+                return () => {
+                    clearInterval(interval);
+                    clearTimeout(timeout);
+                };
+            }
+        }
+    }, [isLoggedIn, refetchSubscription]);
 
     // Upload Logic
     const fileInputRef = useRef(null);

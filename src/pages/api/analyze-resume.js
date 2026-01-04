@@ -4,6 +4,7 @@ import { extractTextFromFile } from '../../lib/fileParser.js';
 import { parseResumeTextToStructuredData } from '../../lib/resumeParser.js';
 import { checkRateLimit } from '../../lib/rateLimit.js';
 import { checkSubscription } from '../../lib/entitlement.js';
+import { checkAiLimit, recordAiUsage } from '../../lib/server/subscriptionUtils.js';
 import { logger } from '../../lib/logger';
 import { MetadataSchema } from '../../lib/schemas';
 
@@ -31,6 +32,7 @@ export async function POST({ request }) {
 
     const formData = await request.formData();
     const file = formData.get('file');
+    const resumeId = formData.get('resumeId');
     
     // Validate non-file fields
     const rawMetadata = {
@@ -46,14 +48,15 @@ export async function POST({ request }) {
 
     const { userId, careerLevel } = result.data;
 
-    if (!file) {
-      return new Response(JSON.stringify({ error: 'Missing resume file' }), {
+    if (!file && !resumeId) {
+      return new Response(JSON.stringify({ error: 'Missing resume file or resume ID' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' }
       });
     }
 
-    if (!checkRateLimit(userId)) {
+    const isAllowed = await checkRateLimit(userId, 'analyze-resume');
+    if (!isAllowed) {
       return new Response(JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }), {
         status: 429,
         headers: { 'Content-Type': 'application/json' }
@@ -70,31 +73,25 @@ export async function POST({ request }) {
     }
 
     // Check Subscription Entitlement
-    // This is optional for analysis (maybe 1 free?), but let's enforce or just check logic.
-    // The requirement said: "Enforce entitlements server-side (API checks subscription status on every protected request)."
-    // Resume analysis is the core feature.
-    // Assuming we want to allow at least one free analysis or check if they have paid.
-    // But for now, let's just log or maybe enforcing it strictly would block free users if they don't have a plan.
-    // Wait, the prompt implies "users can bypass UI checks". So if the UI says "Upgrade to analyze", the API should block it.
-    // Let's assume unlimited for Pro/Lifetime, and maybe limited for free.
-    // For now, I will add the check but maybe not block if it's the *first* time?
-    // Actually, let's strictly enforce subscription if the user is *supposed* to be paid.
-    // But wait, is there a free tier? "Pro Plan" and "Lifetime Plan".
-    // If no free tier, then we must block.
-    // If there is a free tier (e.g. 1 free), we need logic for that.
-    // Let's look at `check-download-limit.js`. It implies limits.
-    // Let's assume for now we just want to ensure the user is valid, and if they are trying to access PRO features they need a sub.
-    // But `analyze-resume` might be the basic feature.
-    // Let's check `PaywallModal.jsx`: "Unlimited resume analyses" is a Pro feature.
-    // This implies free users might have limits.
-    // Let's check if there is a "check-analysis-limit" logic.
-    // I see `check-download-limit.js`.
-    // Let's look for `check-analysis-limit` or similar.
-    // Actually, let's just add the subscription check helper usage.
-    
-    // For now, I will NOT block `analyze-resume` completely because free users might get 1 free analysis.
-    // But I should definitely block `improve-resume` or `tailor-resume` if those are premium.
-    // Let's check `improve-resume.js`.
+    const hasValidSubscription = await checkSubscription(userId);
+    let isEntitled = hasValidSubscription;
+
+    if (!isEntitled) {
+        const limitCheck = await checkAiLimit(userId);
+        if (limitCheck.canGenerate) {
+            isEntitled = true;
+            // Record usage for free users to enforce the limit
+            await recordAiUsage(userId);
+        } else {
+             return new Response(JSON.stringify({ 
+                error: 'You have reached your free limit for resume analysis. Please upgrade to Pro for unlimited access.',
+                code: 'LIMIT_REACHED'
+            }), {
+                status: 403,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+    }
 
 
     // Create authenticated Supabase client for this user's session
@@ -112,9 +109,34 @@ export async function POST({ request }) {
 
     // Extract text from resume
     let resumeText;
+    let fileName = file ? file.name : 'Stored Resume';
+
     try {
-      logger.log('Starting text extraction for file:', file.name, 'type:', file.type, 'size:', file.size);
-      resumeText = await extractTextFromFile(file);
+      if (resumeId) {
+          // Fetch from DB
+          const { data: resume, error: resumeError } = await authenticatedSupabase
+              .from('resumes')
+              .select('raw_text, title')
+              .eq('id', resumeId)
+              .single();
+          
+          if (resumeError || !resume) {
+              throw new Error('Resume not found');
+          }
+          resumeText = resume.raw_text;
+          fileName = resume.title;
+          
+          if (!resumeText) {
+              // Fallback: Try to reconstruct from JSON content? 
+              // For now, if raw_text is missing (old resumes?), we might fail or need fallback.
+              // But new uploads will have it.
+              throw new Error('Resume text not available for this version');
+          }
+      } else {
+          logger.log('Starting text extraction for file:', file.name, 'type:', file.type, 'size:', file.size);
+          resumeText = await extractTextFromFile(file);
+      }
+
       logger.log('Extracted text length:', resumeText?.length);
       logger.log('First 300 characters:', resumeText?.substring(0, 300));
     } catch (extractError) {
@@ -186,7 +208,7 @@ export async function POST({ request }) {
     const context = careerLevelContext[careerLevel] || careerLevelContext['professional'];
 
     const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-3-5-sonnet-20240620",
       max_tokens: 8000,
       temperature: 0.7,
       messages: [{
@@ -391,7 +413,7 @@ Format your response as valid JSON with this exact structure:
       .from('resume_analyses')
       .insert({
         user_id: userId,
-        file_name: file.name,
+        file_name: fileName,
         analysis_text: message.content[0].text,
         ats_score: analysis.ats_score,
         suggestions: {
@@ -417,7 +439,8 @@ Format your response as valid JSON with this exact structure:
 
     return new Response(JSON.stringify({
       success: true,
-      analysis: savedAnalysis
+      analysis: savedAnalysis,
+      resumeText: resumeText // Return extracted text for client-side use (e.g. auto-fix)
     }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }

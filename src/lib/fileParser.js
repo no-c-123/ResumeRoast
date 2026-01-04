@@ -40,33 +40,8 @@ export async function extractTextFromFile(file) {
  * @returns {Promise<string>} - Extracted text
  */
 async function extractFromPDF(file) {
-  console.log('Starting PDF extraction for file:', file.name, 'size:', file.size);
-  
-  // Try pdf-parse first as it's generally more reliable for text extraction
   try {
-    console.log('Attempting extraction with pdf-parse...');
-    const pdf = await import('pdf-parse');
-    // Handle default export for both CommonJS and ESM
-    const pdfParse = pdf.default || pdf;
-    
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    
-    const data = await pdfParse(buffer);
-    
-    if (data && data.text && data.text.trim().length > 50) {
-        console.log('pdf-parse success. Text length:', data.text.length);
-        return data.text.trim();
-    } else {
-        console.log('pdf-parse returned empty or too short text, falling back to pdfreader');
-    }
-  } catch (e) {
-      console.warn('pdf-parse failed:', e);
-      console.log('Falling back to pdfreader...');
-  }
-
-  // Fallback to pdfreader
-  try {
+    console.log('Starting PDF extraction for file:', file.name, 'size:', file.size);
     const { PdfReader } = await import('pdfreader');
     
     const arrayBuffer = await file.arrayBuffer();
@@ -78,13 +53,13 @@ async function extractFromPDF(file) {
       const reader = new PdfReader();
       let fullText = '';
       let currentPage = 0;
+      let lastY = -1;
       
       reader.parseBuffer(buffer, (err, item) => {
         if (err) {
           console.error('PDF parse error:', err);
           reject(new Error('PDF parsing failed: ' + err.message));
         } else if (!item) {
-          // End of file
           console.log('PDF parsing complete. Total text length:', fullText.length);
           console.log('First 500 chars:', fullText.substring(0, 500));
           
@@ -94,13 +69,23 @@ async function extractFromPDF(file) {
             resolve(fullText.trim());
           }
         } else if (item.page) {
-          // New page
           currentPage = item.page;
           fullText += '\n';
           console.log('Processing page', currentPage);
+          lastY = -1;
         } else if (item.text) {
-          // Text item
-          fullText += item.text + ' ';
+          // Check for vertical position change to detect new lines
+          if (lastY !== -1 && Math.abs(item.y - lastY) > 0.5) {
+            fullText += '\n';
+          } else if (lastY !== -1 && !fullText.endsWith('\n')) {
+             // Add space between words on the same line if not already spaced
+             if (!fullText.endsWith(' ')) {
+                fullText += ' ';
+             }
+          }
+          
+          fullText += item.text;
+          lastY = item.y;
         }
       });
     });
@@ -151,10 +136,9 @@ export function validateResumeFile(file) {
   return { valid: true };
 }
 
-// Magic numbers
 const PDF_MAGIC = [0x25, 0x50, 0x44, 0x46]; // %PDF
 const ZIP_MAGIC = [0x50, 0x4B, 0x03, 0x04]; // PK.. (DOCX is a zip)
-const DOC_MAGIC = [0xD0, 0xCF, 0x11, 0xE0]; // DOC
+const DOC_MAGIC = [0xD0, 0xCF, 0x11, 0xE0]; // DOCx
 
 async function validateFileContent(file) {
     try {
@@ -182,15 +166,10 @@ async function validateFileContent(file) {
             if (bytes[0] === DOC_MAGIC[0] && bytes[1] === DOC_MAGIC[1] && bytes[2] === DOC_MAGIC[2] && bytes[3] === DOC_MAGIC[3]) {
                 return true;
             }
-            // Some DOC files might vary, but this is standard OLE
-            // Allow if it fails? No, stricter is better for security.
-            // But to avoid false positives on valid but weird DOCs, maybe log warning?
-            // User requirement is "Malicious files could potentially cause issues".
-            // So return false if not matching.
             return false;
         }
         
-        return true; // Unknown type, let existing logic handle
+        return true;
     } catch (e) {
         console.error('Error validating file content:', e);
         return false;

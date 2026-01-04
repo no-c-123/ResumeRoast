@@ -18,6 +18,10 @@ export default function CoverLetterGenerator() {
     const [selectedAchievements, setSelectedAchievements] = useState([]);
     const [achievementsList, setAchievementsList] = useState([]);
     
+    const [resumes, setResumes] = useState([]);
+    const [selectedResumeId, setSelectedResumeId] = useState(null);
+    const [showResumeSelector, setShowResumeSelector] = useState(false);
+    
     // Mock analysis data for the sidebar
     const [analysis, setAnalysis] = useState(null);
 
@@ -28,12 +32,27 @@ export default function CoverLetterGenerator() {
     const fetchProfile = async () => {
         try {
             if (!user) return;
-            const data = contextProfile || await dbService.getProfile(user.id);
-            setProfile(data);
+            
+            // Fetch profile and resumes in parallel
+            const [profileData, resumesData] = await Promise.all([
+                contextProfile || dbService.getProfile(user.id),
+                dbService.getResumes(user.id)
+            ]);
+            
+            setProfile(profileData);
+            setResumes(resumesData || []);
+
+            // Select the most recent active resume, or the first one
+            if (resumesData && resumesData.length > 0) {
+                const active = resumesData.find(r => r.is_active) || resumesData[0];
+                setSelectedResumeId(active.id);
+            }
             
             // Extract achievements from work experience for the checklist
-            if (data?.work_experience) {
-                const bullets = data.work_experience.flatMap(exp => 
+            // We use the profile by default, but this should update when resume changes if possible. 
+            // For now, let's just stick to profile for achievements as it's simpler, or we can try to extract from selected resume.
+            if (profileData?.work_experience) {
+                const bullets = profileData.work_experience.flatMap(exp => 
                     exp.description ? exp.description.split('.').filter(s => s.trim().length > 10).map(s => s.trim()) : []
                 ).slice(0, 5); // Take first 5
                 setAchievementsList(bullets);
@@ -53,13 +72,27 @@ export default function CoverLetterGenerator() {
 
         try {
             const session = await authService.getSession();
-            // Prepare data for API
-            const resumeData = {
-                profile,
-                work_experience: profile.work_experience,
-                education: profile.education,
-                projects: profile.projects
-            };
+            
+            let resumeData;
+            if (selectedResumeId) {
+                const selectedResume = resumes.find(r => r.id === selectedResumeId);
+                if (selectedResume && selectedResume.content) {
+                    resumeData = selectedResume.content;
+                }
+            }
+            
+            if (!resumeData && profile) {
+                resumeData = {
+                    profile,
+                    work_experience: profile.work_experience,
+                    education: profile.education,
+                    projects: profile.projects
+                };
+            }
+
+            if (!resumeData) {
+                throw new Error('No resume data available');
+            }
 
             const response = await fetch('/api/generate-cover-letter', {
                 method: 'POST',
@@ -148,12 +181,16 @@ export default function CoverLetterGenerator() {
                     <div className="w-full lg:w-[40%] space-y-6">
                         
                         {/* Resume Selection Card */}
-                        <div className="bg-[#1a1a1a] border border-orange-500/30 rounded-xl p-5 shadow-lg hover:shadow-orange-500/10 transition-all cursor-pointer group">
+                        <div 
+                            className="bg-[#1a1a1a] border border-orange-500/30 rounded-xl p-5 shadow-lg hover:shadow-orange-500/10 transition-all cursor-pointer group"
+                            onClick={() => setShowResumeSelector(true)}
+                        >
                             <div className="flex justify-between items-start mb-3">
                                 <h3 className="font-semibold text-white group-hover:text-orange-400 transition-colors">Your Resume</h3>
-                                <button className="text-neutral-500 hover:text-white transition-colors">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
+                                <button className="text-neutral-500 hover:text-white transition-colors flex items-center gap-1 text-xs">
+                                    Change
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-3 h-3">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
                                     </svg>
                                 </button>
                             </div>
@@ -161,9 +198,15 @@ export default function CoverLetterGenerator() {
                                 <div className="w-10 h-14 bg-white/10 rounded flex items-center justify-center border border-white/5">
                                     <span className="text-xs text-neutral-400">PDF</span>
                                 </div>
-                                <div>
-                                    <p className="text-sm font-medium text-white">{profile?.full_name ? `${profile.full_name} - Resume` : 'My Resume'}</p>
-                                    <p className="text-xs text-neutral-500">Last updated: {new Date().toLocaleDateString()}</p>
+                                <div className="overflow-hidden">
+                                    <p className="text-sm font-medium text-white truncate">
+                                        {resumes.find(r => r.id === selectedResumeId)?.title || profile?.full_name || 'My Resume'}
+                                    </p>
+                                    <p className="text-xs text-neutral-500 truncate">
+                                        {selectedResumeId 
+                                            ? `Updated: ${new Date(resumes.find(r => r.id === selectedResumeId)?.updated_at).toLocaleDateString()}` 
+                                            : 'Using default profile'}
+                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -440,7 +483,77 @@ export default function CoverLetterGenerator() {
                         )}
                     </div>
                 </div>
+                {/* Resume Selector Modal */}
+                {showResumeSelector && (
+                    <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setShowResumeSelector(false)}>
+                        <div className="bg-[#1a1a1a] border border-orange-500/30 rounded-2xl p-6 max-w-lg w-full max-h-[80vh] overflow-y-auto shadow-2xl animate-in fade-in zoom-in duration-200" onClick={e => e.stopPropagation()}>
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-xl font-bold text-white">Select Resume</h3>
+                                <button onClick={() => setShowResumeSelector(false)} className="text-neutral-400 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors">✕</button>
+                            </div>
+                            
+                            <div className="space-y-3">
+                                {resumes.map(resume => (
+                                    <label key={resume.id} className={`flex items-center gap-4 p-4 rounded-xl border cursor-pointer transition-all group ${selectedResumeId === resume.id ? 'border-orange-500 bg-orange-500/10' : 'border-neutral-800 bg-[#151515] hover:border-neutral-700'}`}>
+                                        <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${selectedResumeId === resume.id ? 'border-orange-500' : 'border-neutral-600 group-hover:border-neutral-400'}`}>
+                                            {selectedResumeId === resume.id && <div className="w-3 h-3 rounded-full bg-orange-500"></div>}
+                                        </div>
+                                        <input 
+                                            type="radio" 
+                                            name="resume" 
+                                            checked={selectedResumeId === resume.id}
+                                            onChange={() => {
+                                                setSelectedResumeId(resume.id);
+                                                setShowResumeSelector(false);
+                                            }}
+                                            className="hidden"
+                                        />
+                                        <div className="flex-1 min-w-0">
+                                            <div className="font-bold text-white truncate">{resume.title || 'Untitled Resume'}</div>
+                                            <div className="text-xs text-neutral-500 flex items-center gap-2">
+                                                <span>{new Date(resume.updated_at).toLocaleDateString()}</span>
+                                                {resume.is_active && <span className="text-[10px] bg-green-500/20 text-green-500 px-1.5 py-0.5 rounded border border-green-500/20">Active</span>}
+                                            </div>
+                                        </div>
+                                    </label>
+                                ))}
+                                
+                                {resumes.length === 0 && (
+                                    <div className="text-center py-8 text-neutral-500 border border-dashed border-neutral-800 rounded-xl">
+                                        <p className="mb-2">No resumes found.</p>
+                                        <a href="/versions" className="text-orange-400 hover:text-orange-300 font-bold hover:underline">Upload a resume first</a>
+                                    </div>
+                                )}
+                            </div>
+                            
+                            <div className="mt-6 pt-4 border-t border-neutral-800 flex justify-between items-center">
+                                <a href="/versions" className="text-sm text-neutral-400 hover:text-white flex items-center gap-2 transition-colors">
+                                    <span className="text-lg">📂</span>
+                                    <span>Manage Resumes</span>
+                                </a>
+                                <button 
+                                    onClick={() => setShowResumeSelector(false)}
+                                    className="px-4 py-2 bg-white text-black font-bold rounded-lg hover:bg-neutral-200 transition-colors"
+                                >
+                                    Done
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
 }
+
+// Add the modal before the closing div
+const Modal = ({ show, onClose, children }) => {
+    if (!show) return null;
+    return (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={onClose}>
+            <div className="bg-[#1a1a1a] border border-orange-500/30 rounded-2xl p-6 max-w-lg w-full max-h-[80vh] overflow-y-auto shadow-2xl animate-in fade-in zoom-in duration-200" onClick={e => e.stopPropagation()}>
+                {children}
+            </div>
+        </div>
+    );
+};

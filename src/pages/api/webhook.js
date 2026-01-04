@@ -1,6 +1,7 @@
 import { stripe } from '../../lib/stripe';
 import { supabaseAdmin } from '../../lib/supabaseAdmin';
 import { logger } from '../../lib/logger';
+import { SERVER_PLANS } from '../../config/plans';
 
 export const POST = async ({ request }) => {
   const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET || import.meta.env.STRIPE_WEBHOOK_SECRET;
@@ -24,14 +25,19 @@ export const POST = async ({ request }) => {
       });
     }
   } else {
-    // Fallback for development without signature verification (NOT RECOMMENDED for production)
-    // But constructEvent is strict if secret is provided.
-    // If no secret, we might parse body directly, but usually we want secret.
-    // For now assuming secret is present or we try JSON parse if not (but Stripe usually requires verification).
-    try {
-       event = JSON.parse(body);
-    } catch (e) {
-       return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
+    // Only allow skipping verification in development environment
+    if (process.env.NODE_ENV === 'development') {
+      try {
+         event = JSON.parse(body);
+      } catch (e) {
+         return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' }
+         });
+      }
+    } else {
+       logger.error('Webhook signature verification is required in production.');
+       return new Response(JSON.stringify({ error: 'Webhook signature verification required' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' }
        });
@@ -120,10 +126,14 @@ async function handleCheckoutCompleted(session) {
         plan = 'lifetime';
       } else {
         const price = subscription.items.data[0]?.price;
-        if (price?.lookup_key?.includes('Pro') || price?.lookup_key?.includes('pro')) {
+        // Check against config or fallback to loose matching
+        if (price?.lookup_key === SERVER_PLANS.pro.lookup_key || 
+            price?.lookup_key?.includes('Pro') || 
+            price?.lookup_key?.includes('pro')) {
           plan = 'pro';
         } else {
-          plan = 'pro';
+          logger.warn(`Unknown subscription plan lookup_key: ${price?.lookup_key}. Defaulting to free.`);
+          plan = 'free';
         }
       }
     }
@@ -192,9 +202,13 @@ async function handleSubscriptionUpdate(subscription) {
     }
 
     const price = subscription.items.data[0]?.price;
-    let plan = 'pro';
-    if (price?.lookup_key?.includes('Pro') || price?.lookup_key?.includes('pro')) {
+    let plan = 'free';
+    if (price?.lookup_key === SERVER_PLANS.pro.lookup_key || 
+        price?.lookup_key?.includes('Pro') || 
+        price?.lookup_key?.includes('pro')) {
       plan = 'pro';
+    } else {
+       logger.warn(`Unknown subscription update plan lookup_key: ${price?.lookup_key}. Defaulting to free.`);
     }
 
     const subscriptionData = {

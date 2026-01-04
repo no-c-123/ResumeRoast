@@ -56,7 +56,8 @@ export async function POST({ request }) {
 
     const userId = user.id;
 
-    if (!checkRateLimit(userId)) {
+    const isAllowedRate = await checkRateLimit(userId, 'generate-cover-letter');
+    if (!isAllowedRate) {
       return new Response(JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }), {
         status: 429,
         headers: { 'Content-Type': 'application/json' }

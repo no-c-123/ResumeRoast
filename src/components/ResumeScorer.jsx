@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { dbService, authService } from '../services/supabase';
 import Loader from './uicomponents/Loader';
+import { renderTemplate } from './ResumeTemplates.jsx';
+import { generateResumePDF } from '../lib/pdfGenerator';
+
 import { motion } from 'framer-motion';
 
 export default function ResumeScorer() {
@@ -13,6 +16,12 @@ export default function ResumeScorer() {
     const [result, setResult] = useState(null);
     const [fixing, setFixing] = useState(null); // 'keywords', 'ats', etc.
     const [fixedData, setFixedData] = useState(null);
+    const [isDownloading, setIsDownloading] = useState(false);
+    const [selectedTemplate, setSelectedTemplate] = useState('ivy');
+
+    const [resumes, setResumes] = useState([]);
+    const [selectedResumeId, setSelectedResumeId] = useState(null);
+    const [showResumeSelector, setShowResumeSelector] = useState(false);
 
     useEffect(() => {
         fetchProfile();
@@ -21,8 +30,21 @@ export default function ResumeScorer() {
     const fetchProfile = async () => {
         try {
             if (!user) return;
-            const data = contextProfile || await dbService.getProfile(user.id);
-            setProfile(data);
+            
+            // Fetch profile and resumes in parallel
+            const [profileData, resumesData] = await Promise.all([
+                contextProfile || dbService.getProfile(user.id),
+                dbService.getResumes(user.id)
+            ]);
+
+            setProfile(profileData);
+            setResumes(resumesData || []);
+            
+            // Select the most recent active resume, or the first one, or null
+            if (resumesData && resumesData.length > 0) {
+                const active = resumesData.find(r => r.is_active) || resumesData[0];
+                setSelectedResumeId(active.id);
+            }
         } catch (err) {
             console.error(err);
         } finally {
@@ -38,13 +60,31 @@ export default function ResumeScorer() {
 
         try {
             const session = await authService.getSession();
-            const resumeData = {
-                profile,
-                work_experience: profile.work_experience,
-                education: profile.education,
-                projects: profile.projects,
-                skills: profile.skills
-            };
+            
+            let resumeData;
+            
+            if (selectedResumeId) {
+                const selectedResume = resumes.find(r => r.id === selectedResumeId);
+                if (selectedResume && selectedResume.content) {
+                    resumeData = selectedResume.content;
+                }
+            }
+
+            // Fallback to profile if no specific resume selected or content missing
+            if (!resumeData && profile) {
+                resumeData = {
+                    profile: profile, // legacy structure often has flat profile fields
+                    full_name: profile.full_name, // ensure top level fields exist if parser expects them
+                    work_experience: profile.work_experience,
+                    education: profile.education,
+                    projects: profile.projects,
+                    skills: profile.skills
+                };
+            }
+
+            if (!resumeData) {
+                throw new Error('No resume data available to analyze');
+            }
 
             // Call dedicated scoring endpoint
             const response = await fetch('/api/score-resume', {
@@ -131,6 +171,25 @@ export default function ResumeScorer() {
         }
     };
 
+    const handleDownload = async () => {
+        if (!fixedData) return;
+        setIsDownloading(true);
+        try {
+            generateResumePDF(
+                fixedData.profile,
+                fixedData.work_experience || [],
+                fixedData.education || [],
+                fixedData.projects || [],
+                selectedTemplate
+            );
+        } catch (error) {
+            console.error("PDF generation failed", error);
+            alert("Failed to generate PDF");
+        } finally {
+            setIsDownloading(false);
+        }
+    };
+
     if (loading) return <div className="min-h-screen bg-black flex items-center justify-center"><Loader /></div>;
 
     return (
@@ -153,13 +212,30 @@ export default function ResumeScorer() {
 
                     <div className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-2 gap-6 mt-8 text-left">
                         {/* Resume Selector */}
-                        <div className="bg-[#1a1a1a] border border-purple-500/30 rounded-xl p-6 hover:shadow-lg hover:shadow-purple-500/10 transition-all">
-                            <h3 className="text-purple-400 font-semibold mb-4 uppercase text-sm tracking-wider">Your Resume</h3>
-                            <div className="flex items-center gap-4 bg-white/5 p-4 rounded-lg border border-white/5">
-                                <div className="w-12 h-16 bg-white text-black flex items-center justify-center text-xs font-bold rounded">PDF</div>
-                                <div>
-                                    <div className="font-bold text-white">{profile?.full_name || 'My Resume'}</div>
-                                    <div className="text-xs text-neutral-500">Last analyzed: Never</div>
+                        <div 
+                            className="bg-[#1a1a1a] border border-purple-500/30 rounded-xl p-6 hover:shadow-lg hover:shadow-purple-500/10 transition-all cursor-pointer group"
+                            onClick={() => setShowResumeSelector(true)}
+                        >
+                            <div className="flex justify-between items-start mb-4">
+                                <h3 className="text-purple-400 font-semibold uppercase text-sm tracking-wider">Your Resume</h3>
+                                <span className="text-xs text-neutral-500 group-hover:text-purple-400 transition-colors flex items-center gap-1">
+                                    Change 
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-3 h-3">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                                    </svg>
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-4 bg-white/5 p-4 rounded-lg border border-white/5 group-hover:border-purple-500/30 transition-colors">
+                                <div className="w-12 h-16 bg-white text-black flex items-center justify-center text-xs font-bold rounded shadow-lg shrink-0">PDF</div>
+                                <div className="overflow-hidden">
+                                    <div className="font-bold text-white truncate pr-2">
+                                        {resumes.find(r => r.id === selectedResumeId)?.title || profile?.full_name || 'My Resume'}
+                                    </div>
+                                    <div className="text-xs text-neutral-500 truncate">
+                                        {selectedResumeId 
+                                            ? `Last updated: ${new Date(resumes.find(r => r.id === selectedResumeId)?.updated_at).toLocaleDateString()}` 
+                                            : 'Using default profile'}
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -178,9 +254,9 @@ export default function ResumeScorer() {
 
                     <button
                         onClick={handleAnalyze}
-                        disabled={!jobDescription || analyzing}
+                        disabled={!jobDescription || analyzing || (!selectedResumeId && !profile)}
                         className={`px-10 py-4 rounded-full font-bold text-lg shadow-xl transition-all ${
-                            !jobDescription || analyzing
+                            !jobDescription || analyzing || (!selectedResumeId && !profile)
                                 ? 'bg-neutral-800 text-neutral-500 cursor-not-allowed'
                                 : 'bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:scale-105 hover:shadow-pink-500/30'
                         }`}
@@ -188,6 +264,65 @@ export default function ResumeScorer() {
                         {analyzing ? 'Scanning...' : '✨ Analyze Match Score'}
                     </button>
                 </div>
+
+                {/* Resume Selector Modal */}
+                {showResumeSelector && (
+                    <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setShowResumeSelector(false)}>
+                        <div className="bg-[#1a1a1a] border border-purple-500/30 rounded-2xl p-6 max-w-lg w-full max-h-[80vh] overflow-y-auto shadow-2xl animate-in fade-in zoom-in duration-200" onClick={e => e.stopPropagation()}>
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-xl font-bold text-white">Select Resume to Analyze</h3>
+                                <button onClick={() => setShowResumeSelector(false)} className="text-neutral-400 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors">✕</button>
+                            </div>
+                            
+                            <div className="space-y-3">
+                                {resumes.map(resume => (
+                                    <label key={resume.id} className={`flex items-center gap-4 p-4 rounded-xl border cursor-pointer transition-all group ${selectedResumeId === resume.id ? 'border-purple-500 bg-purple-500/10' : 'border-neutral-800 bg-[#151515] hover:border-neutral-700'}`}>
+                                        <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${selectedResumeId === resume.id ? 'border-purple-500' : 'border-neutral-600 group-hover:border-neutral-400'}`}>
+                                            {selectedResumeId === resume.id && <div className="w-3 h-3 rounded-full bg-purple-500"></div>}
+                                        </div>
+                                        <input 
+                                            type="radio" 
+                                            name="resume" 
+                                            checked={selectedResumeId === resume.id}
+                                            onChange={() => {
+                                                setSelectedResumeId(resume.id);
+                                                setShowResumeSelector(false);
+                                            }}
+                                            className="hidden"
+                                        />
+                                        <div className="flex-1 min-w-0">
+                                            <div className="font-bold text-white truncate">{resume.title || 'Untitled Resume'}</div>
+                                            <div className="text-xs text-neutral-500 flex items-center gap-2">
+                                                <span>{new Date(resume.updated_at).toLocaleDateString()}</span>
+                                                {resume.is_active && <span className="text-[10px] bg-green-500/20 text-green-500 px-1.5 py-0.5 rounded border border-green-500/20">Active</span>}
+                                            </div>
+                                        </div>
+                                    </label>
+                                ))}
+                                
+                                {resumes.length === 0 && (
+                                    <div className="text-center py-8 text-neutral-500 border border-dashed border-neutral-800 rounded-xl">
+                                        <p className="mb-2">No resumes found.</p>
+                                        <a href="/versions" className="text-purple-400 hover:text-purple-300 font-bold hover:underline">Upload a resume first</a>
+                                    </div>
+                                )}
+                            </div>
+                            
+                            <div className="mt-6 pt-4 border-t border-neutral-800 flex justify-between items-center">
+                                <a href="/versions" className="text-sm text-neutral-400 hover:text-white flex items-center gap-2 transition-colors">
+                                    <span className="text-lg">📂</span>
+                                    <span>Manage Resumes</span>
+                                </a>
+                                <button 
+                                    onClick={() => setShowResumeSelector(false)}
+                                    className="px-4 py-2 bg-white text-black font-bold rounded-lg hover:bg-neutral-200 transition-colors"
+                                >
+                                    Done
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Analysis Overlay */}
                 {analyzing && (
@@ -403,8 +538,12 @@ export default function ResumeScorer() {
                             >
                                 <div className="flex items-center justify-between mb-6">
                                     <h3 className="text-2xl font-bold text-white">✨ Improved Resume Preview</h3>
-                                    <button className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-600 rounded-lg font-bold text-white shadow-lg hover:shadow-green-500/20 transition-all">
-                                        Download Improved PDF
+                                    <button 
+                                        onClick={handleDownload}
+                                        disabled={isDownloading}
+                                        className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-600 rounded-lg font-bold text-white shadow-lg hover:shadow-green-500/20 transition-all disabled:opacity-50"
+                                    >
+                                        {isDownloading ? 'Generating PDF...' : 'Download Improved PDF'}
                                     </button>
                                 </div>
 
@@ -413,79 +552,17 @@ export default function ResumeScorer() {
                                     
                                     {/* Resume Content */}
                                     <div className="max-w-4xl mx-auto space-y-6">
-                                        <header className="text-center border-b pb-6">
-                                            <h1 className="text-3xl font-bold mb-2">{fixedData.profile?.full_name}</h1>
-                                            <div className="flex justify-center gap-4 text-sm text-gray-600">
-                                                <span>{fixedData.profile?.email}</span>
-                                                <span>{fixedData.profile?.phone}</span>
-                                                <span>{fixedData.profile?.location}</span>
-                                                <span>{fixedData.profile?.linkedin}</span>
-                                            </div>
-                                        </header>
-
-                                        <section>
-                                            <h2 className="text-sm font-bold uppercase tracking-wider border-b-2 border-black mb-3">Professional Summary</h2>
-                                            <p className="text-sm leading-relaxed">{fixedData.profile?.professional_summary}</p>
-                                        </section>
-
-                                        <section>
-                                            <h2 className="text-sm font-bold uppercase tracking-wider border-b-2 border-black mb-3">Skills</h2>
-                                            <p className="text-sm leading-relaxed">{fixedData.profile?.skills}</p>
-                                        </section>
-
-                                        <section>
-                                            <h2 className="text-sm font-bold uppercase tracking-wider border-b-2 border-black mb-3">Work Experience</h2>
-                                            <div className="space-y-4">
-                                                {fixedData.work_experience?.map((job, i) => (
-                                                    <div key={i}>
-                                                        <div className="flex justify-between font-bold text-sm">
-                                                            <span>{job.position}</span>
-                                                            <span>{job.start_date} – {job.end_date}</span>
-                                                        </div>
-                                                        <div className="flex justify-between text-sm italic mb-2">
-                                                            <span>{job.company}</span>
-                                                            <span>{job.location}</span>
-                                                        </div>
-                                                        <ul className="list-disc ml-4 space-y-1">
-                                                            {(job.description || '').split('|').map((bullet, j) => (
-                                                                <li key={j} className="text-sm pl-1">{bullet.trim()}</li>
-                                                            ))}
-                                                        </ul>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </section>
-                                        
-                                        <section>
-                                            <h2 className="text-sm font-bold uppercase tracking-wider border-b-2 border-black mb-3">Projects</h2>
-                                            <div className="space-y-4">
-                                                {fixedData.projects?.map((proj, i) => (
-                                                    <div key={i}>
-                                                        <div className="flex justify-between font-bold text-sm">
-                                                            <span>{proj.title}</span>
-                                                        </div>
-                                                        <p className="text-sm mt-1">{proj.description}</p>
-                                                        {proj.tech && <p className="text-xs text-gray-500 mt-1 italic">Tech: {proj.tech}</p>}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </section>
-
-                                        <section>
-                                            <h2 className="text-sm font-bold uppercase tracking-wider border-b-2 border-black mb-3">Education</h2>
-                                            <div className="space-y-4">
-                                                {fixedData.education?.map((edu, i) => (
-                                                    <div key={i}>
-                                                        <div className="flex justify-between font-bold text-sm">
-                                                            <span>{edu.institution}</span>
-                                                            <span>{edu.graduation_date}</span>
-                                                        </div>
-                                                        <div className="text-sm">{edu.degree}</div>
-                                                        <div className="text-sm text-gray-600">{edu.location}</div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </section>
+                                        {renderTemplate({
+                                            selectedTemplate: 'ivy',
+                                            templates: [{ id: 'ivy', name: 'Ivy League', font: 'Times New Roman, serif', color: '#000000' }],
+                                            profile: fixedData.profile || {},
+                                            hasWorkExperience: (fixedData.work_experience || []).length > 0,
+                                            workExperience: fixedData.work_experience || [],
+                                            hasEducation: (fixedData.education || []).length > 0,
+                                            education: fixedData.education || [],
+                                            hasProjects: (fixedData.projects || []).length > 0,
+                                            projects: fixedData.projects || []
+                                        })}
                                     </div>
                                 </div>
                             </motion.div>

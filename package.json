@@ -6,12 +6,17 @@
     "dev": "astro dev --host",
     "build": "astro build",
     "preview": "astro preview",
+    "test": "vitest",
+    "test:e2e": "playwright test",
     "astro": "astro"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
     "@astrojs/node": "^9.5.1",
     "@astrojs/vercel": "^9.0.2",
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@supabase/supabase-js": "^2.87.1",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
@@ -24,7 +29,6 @@
     "jspdf": "^3.0.4",
     "jspdf-autotable": "^5.0.2",
     "mammoth": "^1.11.0",
-    "pdf-parse": "^2.4.5",
     "pdfreader": "^3.0.8",
     "react-dom": "^19.2.3",
     "react-icons-kit": "^2.0.0",
@@ -35,6 +39,7 @@
   "devDependencies": {
     "@astrojs/react": "^4.4.2",
     "@astrojs/tailwind": "^6.0.2",
+    "@playwright/test": "^1.57.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.1",
     "jsdom": "^27.3.0",

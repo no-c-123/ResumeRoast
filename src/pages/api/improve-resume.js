@@ -46,7 +46,8 @@ export async function POST({ request }) {
 
     const { userId, resumeText, resumeData, analysisId, customInstructions } = result.data;
 
-    if (!checkRateLimit(userId)) {
+    const isAllowedRate = await checkRateLimit(userId, 'improve-resume');
+    if (!isAllowedRate) {
       return new Response(JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }), {
         status: 429,
         headers: { 'Content-Type': 'application/json' }
@@ -89,8 +90,24 @@ export async function POST({ request }) {
 
     let finalResumeData = resumeData;
     
-    if (resumeText && (!resumeData || !resumeData.profile || !resumeData.profile.full_name)) {
-      const parsedResume = parseResumeTextToStructuredData(resumeText);
+    // If no explicit resumeData is provided, try to build it from resumeText or fetch from DB
+    if (!finalResumeData || !finalResumeData.profile || !finalResumeData.profile.full_name) {
+      
+      let parsedResume = { 
+          profile: {}, 
+          work_experience: [], 
+          education: [], 
+          projects: [] 
+      };
+
+      if (resumeText) {
+          try {
+            parsedResume = parseResumeTextToStructuredData(resumeText);
+          } catch (e) {
+            logger.warn('Failed to parse provided resumeText', e);
+          }
+      }
+
       const { data: profileData } = await supabase
         .from('user_profiles')
         .select('*')
@@ -99,18 +116,18 @@ export async function POST({ request }) {
       
       finalResumeData = {
         profile: {
-          full_name: parsedResume.profile.full_name || profileData?.full_name || '',
-          professional_summary: parsedResume.profile.professional_summary || profileData?.professional_summary || '',
-          email: parsedResume.profile.email || profileData?.email || user.email,
-          phone: parsedResume.profile.phone || profileData?.phone || '',
-          location: parsedResume.profile.location || profileData?.location || '',
-          linkedin: parsedResume.profile.linkedin || profileData?.linkedin || '',
-          skills: parsedResume.profile.skills || profileData?.skills || '',
-          volunteering: parsedResume.profile.volunteering || profileData?.volunteering || ''
+          full_name: parsedResume.profile?.full_name || profileData?.full_name || '',
+          professional_summary: parsedResume.profile?.professional_summary || profileData?.professional_summary || '',
+          email: parsedResume.profile?.email || profileData?.email || user.email,
+          phone: parsedResume.profile?.phone || profileData?.phone || '',
+          location: parsedResume.profile?.location || profileData?.location || '',
+          linkedin: parsedResume.profile?.linkedin || profileData?.linkedin || '',
+          skills: parsedResume.profile?.skills || profileData?.skills || '',
+          volunteering: parsedResume.profile?.volunteering || profileData?.volunteering || ''
         },
-        work_experience: parsedResume.work_experience.length > 0 ? parsedResume.work_experience : (profileData?.work_experience || []),
-        education: parsedResume.education.length > 0 ? parsedResume.education : (profileData?.education || []),
-        projects: profileData?.projects || []
+        work_experience: parsedResume.work_experience?.length > 0 ? parsedResume.work_experience : (profileData?.work_experience || []),
+        education: parsedResume.education?.length > 0 ? parsedResume.education : (profileData?.education || []),
+        projects: parsedResume.projects?.length > 0 ? parsedResume.projects : (profileData?.projects || [])
       };
     }
 
