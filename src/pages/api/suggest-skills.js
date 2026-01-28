@@ -73,7 +73,7 @@ export async function POST({ request }) {
     }
 
     const message = await anthropic.messages.create({
-      model: "claude-3-haiku-20240307", // Use Haiku for speed and lower cost
+      model: "claude-3-5-haiku-20241022", // Use Haiku for speed and lower cost
       max_tokens: 500,
       temperature: 0.5,
       messages: [{

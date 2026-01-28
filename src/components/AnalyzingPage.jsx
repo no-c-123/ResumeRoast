@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { authService } from '../services/supabase';
+import { authService, dbService } from '../services/supabase';
 import { getFile, setFile, removeFile } from '../lib/storage';
 import { logger } from '../lib/logger';
 import Loader from './uicomponents/Loader.jsx';

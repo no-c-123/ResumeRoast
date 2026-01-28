@@ -9,8 +9,10 @@ import { TailorSchema } from '../../lib/schemas';
 
 export const prerender = false;
 
+const apiKey = process.env.ANTHROPIC_API_KEY || import.meta.env.ANTHROPIC_API_KEY;
+
 const anthropic = new Anthropic({
-  apiKey: import.meta.env.ANTHROPIC_API_KEY
+  apiKey: apiKey
 });
 
 const supabase = createClient(
@@ -181,7 +183,7 @@ export async function POST({ request }) {
         }
 
         const message = await anthropic.messages.create({
-            model: "claude-3-5-sonnet-20240620",
+            model: "claude-sonnet-4-20250514",
             max_tokens: 4000,
             temperature: 0.7,
             messages: [{
