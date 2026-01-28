@@ -22,6 +22,8 @@ export default function ResumeScorer() {
     const [resumes, setResumes] = useState([]);
     const [selectedResumeId, setSelectedResumeId] = useState(null);
     const [showResumeSelector, setShowResumeSelector] = useState(false);
+    const [selectedIssues, setSelectedIssues] = useState([]);
+    const [changesMade, setChangesMade] = useState([]);
 
     useEffect(() => {
         fetchProfile();
@@ -124,10 +126,10 @@ export default function ResumeScorer() {
             // Use current fixed data as base if available to chain edits
             const currentResume = fixedData || {
                 profile,
-                work_experience: profile.work_experience,
-                education: profile.education,
-                projects: profile.projects,
-                skills: profile.skills
+                work_experience: profile?.work_experience || [],
+                education: profile?.education || [],
+                projects: profile?.projects || [],
+                skills: profile?.skills || ''
             };
 
             const response = await fetch('/api/improve-resume', {
@@ -139,25 +141,27 @@ export default function ResumeScorer() {
                 body: JSON.stringify({
                     userId: user.id,
                     resumeData: currentResume,
-                    customInstructions: instructions
+                    customInstructions: Array.isArray(instructions) ? instructions.join('\n') : instructions
                 })
             });
 
             const data = await response.json();
             
             if (data.success && data.improved_resume) {
-                // In a real app, we might update the profile or show a comparison
-                // For now, we'll alert success and maybe update the local score visually
-                alert(`Fix applied! ${data.changes_made?.[0] || 'Resume updated.'}`);
                 setFixedData(data.improved_resume);
+                setChangesMade(data.changes_made || []);
                 
                 // Optimistic update of score (visual only)
-                if (fixType === 'keywords') {
+                if (fixType === 'keywords' || fixType === 'bulk') {
                     setResult(prev => ({
                         ...prev,
-                        score: Math.min(100, prev.score + 15),
-                        missingKeywords: []
+                        score: Math.min(100, prev.score + (fixType === 'bulk' ? 20 : 15)),
+                        missingKeywords: fixType === 'keywords' ? [] : prev.missingKeywords
                     }));
+                }
+                
+                if (fixType === 'bulk') {
+                    setSelectedIssues([]);
                 }
             } else {
                 throw new Error(data.error || 'Failed to apply fix');
@@ -168,6 +172,34 @@ export default function ResumeScorer() {
             alert('Failed to apply fix: ' + error.message);
         } finally {
             setFixing(null);
+        }
+    };
+
+    const handleBulkFix = () => {
+        if (selectedIssues.length === 0) return;
+        
+        const instructions = selectedIssues.map(id => {
+            const action = result.priorityActions.find((_, index) => index === id);
+            return `Fix this critical issue: ${action.title} - ${action.description}`;
+        });
+        
+        handleApplyFix('bulk', instructions);
+    };
+
+    const toggleIssueSelection = (index) => {
+        setSelectedIssues(prev => 
+            prev.includes(index) ? prev.filter(i => i !== index) : [...prev, index]
+        );
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedIssues.length === result.priorityActions.filter(a => a.type === 'critical').length) {
+            setSelectedIssues([]);
+        } else {
+            setSelectedIssues(result.priorityActions
+                .map((a, i) => a.type === 'critical' ? i : null)
+                .filter(i => i !== null)
+            );
         }
     };
 
@@ -488,23 +520,56 @@ export default function ResumeScorer() {
 
                         {/* Action Plan */}
                         <div className="border-t border-neutral-800 pt-8">
-                            <h3 className="text-2xl font-bold text-white mb-6">Priority Action Plan</h3>
+                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                                <h3 className="text-2xl font-bold text-white">Priority Action Plan</h3>
+                                {result.priorityActions?.some(a => a.type === 'critical') && (
+                                    <div className="flex items-center gap-4">
+                                        <button 
+                                            onClick={toggleSelectAll}
+                                            className="text-sm text-neutral-400 hover:text-white transition-colors"
+                                        >
+                                            {selectedIssues.length === result.priorityActions.filter(a => a.type === 'critical').length ? 'Deselect All' : 'Select All Critical'}
+                                        </button>
+                                        <button 
+                                            onClick={handleBulkFix}
+                                            disabled={selectedIssues.length === 0 || fixing === 'bulk'}
+                                            className="px-6 py-2 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full font-bold text-sm shadow-lg hover:scale-105 transition-all disabled:opacity-50 disabled:scale-100"
+                                        >
+                                            {fixing === 'bulk' ? 'Applying...' : `Fix Selected (${selectedIssues.length})`}
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                             <div className="space-y-4">
                                 {result.priorityActions ? result.priorityActions.map((action, i) => (
-                                    <div key={i} className={`bg-[#1a1a1a] border-l-4 ${action.type === 'critical' ? 'border-red-500' : 'border-yellow-500'} rounded-r-xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4`}>
-                                        <div>
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <span className={`px-2 py-0.5 ${action.type === 'critical' ? 'bg-red-500' : 'bg-yellow-500'} ${action.type === 'critical' ? 'text-white' : 'text-black'} text-[10px] font-bold uppercase rounded`}>
-                                                    {action.type === 'critical' ? 'High Priority' : 'Medium Priority'}
-                                                </span>
-                                                <span className="text-green-400 text-sm font-bold">+{action.points} points</span>
+                                    <div 
+                                        key={i} 
+                                        onClick={() => action.type === 'critical' && toggleIssueSelection(i)}
+                                        className={`bg-[#1a1a1a] border-l-4 ${action.type === 'critical' ? 'border-red-500' : 'border-yellow-500'} rounded-r-xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 transition-all ${action.type === 'critical' ? 'cursor-pointer hover:bg-[#222]' : ''} ${selectedIssues.includes(i) ? 'ring-2 ring-purple-500/50 bg-purple-500/5' : ''}`}
+                                    >
+                                        <div className="flex items-start gap-4 flex-1">
+                                            {action.type === 'critical' && (
+                                                <div className={`mt-1 w-5 h-5 rounded border flex items-center justify-center shrink-0 ${selectedIssues.includes(i) ? 'bg-purple-500 border-purple-500' : 'border-neutral-600'}`}>
+                                                    {selectedIssues.includes(i) && <span className="text-white text-xs">✓</span>}
+                                                </div>
+                                            )}
+                                            <div>
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <span className={`px-2 py-0.5 ${action.type === 'critical' ? 'bg-red-500' : 'bg-yellow-500'} ${action.type === 'critical' ? 'text-white' : 'text-black'} text-[10px] font-bold uppercase rounded`}>
+                                                        {action.type === 'critical' ? 'High Priority' : 'Medium Priority'}
+                                                    </span>
+                                                    <span className="text-green-400 text-sm font-bold">+{action.points} points</span>
+                                                </div>
+                                                <h4 className="font-bold text-white">{action.title}</h4>
+                                                <p className="text-sm text-neutral-400">{action.description}</p>
                                             </div>
-                                            <h4 className="font-bold text-white">{action.title}</h4>
-                                            <p className="text-sm text-neutral-400">{action.description}</p>
                                         </div>
                                         {action.type === 'critical' ? (
                                             <button 
-                                                onClick={() => handleApplyFix('critical', `Fix this critical issue: ${action.title} - ${action.description}`)}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleApplyFix('critical', `Fix this critical issue: ${action.title} - ${action.description}`);
+                                                }}
                                                 disabled={fixing === 'critical'}
                                                 className="px-4 py-2 bg-white text-black font-bold rounded hover:bg-neutral-200 transition-colors whitespace-nowrap disabled:opacity-50"
                                             >
@@ -512,7 +577,10 @@ export default function ResumeScorer() {
                                             </button>
                                         ) : (
                                             <button 
-                                                onClick={() => window.location.href = '/resume-builder?mode=editor'}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    window.location.href = '/resume-builder?mode=editor';
+                                                }}
                                                 className="px-4 py-2 bg-neutral-800 text-white font-bold rounded hover:bg-neutral-700 transition-colors whitespace-nowrap"
                                             >
                                                 Fix Manually
@@ -520,7 +588,6 @@ export default function ResumeScorer() {
                                         )}
                                     </div>
                                 )) : (
-                                    // Fallback for older analysis format or if AI didn't return actions
                                     <div className="bg-[#1a1a1a] border-l-4 border-blue-500 rounded-r-xl p-6">
                                         <h4 className="font-bold text-white">Review Results Above</h4>
                                         <p className="text-sm text-neutral-400">Check the keyword and ATS sections for specific improvements.</p>
@@ -538,14 +605,39 @@ export default function ResumeScorer() {
                             >
                                 <div className="flex items-center justify-between mb-6">
                                     <h3 className="text-2xl font-bold text-white">✨ Improved Resume Preview</h3>
-                                    <button 
-                                        onClick={handleDownload}
-                                        disabled={isDownloading}
-                                        className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-600 rounded-lg font-bold text-white shadow-lg hover:shadow-green-500/20 transition-all disabled:opacity-50"
-                                    >
-                                        {isDownloading ? 'Generating PDF...' : 'Download Improved PDF'}
-                                    </button>
+                                    <div className="flex gap-4">
+                                        {changesMade.length > 0 && (
+                                            <div className="flex -space-x-2 overflow-hidden">
+                                                <div className="bg-green-500/20 text-green-400 text-[10px] font-bold px-2 py-1 rounded border border-green-500/30">
+                                                    {changesMade.length} Changes Made
+                                                </div>
+                                            </div>
+                                        )}
+                                        <button 
+                                            onClick={handleDownload}
+                                            disabled={isDownloading}
+                                            className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-600 rounded-lg font-bold text-white shadow-lg hover:shadow-green-500/20 transition-all disabled:opacity-50"
+                                        >
+                                            {isDownloading ? 'Generating PDF...' : 'Download Improved PDF'}
+                                        </button>
+                                    </div>
                                 </div>
+
+                                {changesMade.length > 0 && (
+                                    <div className="mb-8 bg-green-500/5 border border-green-500/20 rounded-xl p-6">
+                                        <h4 className="text-green-400 font-bold mb-3 flex items-center gap-2">
+                                            <span>✨</span> AI Optimization Log
+                                        </h4>
+                                        <ul className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2">
+                                            {changesMade.map((note, i) => (
+                                                <li key={i} className="text-sm text-neutral-300 flex items-start gap-2">
+                                                    <span className="text-green-500 mt-1">•</span>
+                                                    {note}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
 
                                 <div className="bg-white text-black p-8 rounded-xl shadow-2xl relative overflow-hidden min-h-[600px]">
                                     <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-green-400 to-blue-500"></div>

@@ -9,6 +9,8 @@ export default function ResumeTailor() {
     const [loading, setLoading] = useState(true);
     const [step, setStep] = useState(1);
     const [profile, setProfile] = useState(null);
+    const [resumes, setResumes] = useState([]);
+    const [selectedResumeId, setSelectedResumeId] = useState(null);
     const [jobDescription, setJobDescription] = useState('');
     const [tailoring, setTailoring] = useState(false);
     const [tailoredResume, setTailoredResume] = useState(null);
@@ -18,16 +20,29 @@ export default function ResumeTailor() {
     const [isExtracting, setIsExtracting] = useState(false);
 
     useEffect(() => {
-        fetchProfile();
+        fetchData();
     }, [user, contextProfile]);
 
-    const fetchProfile = async () => {
+    const fetchData = async () => {
         try {
             if (!user) return;
-            const data = contextProfile || await dbService.getProfile(user.id);
-            setProfile(data);
+            
+            // Fetch profile and resumes in parallel
+            const [profileData, resumesData] = await Promise.all([
+                contextProfile || dbService.getProfile(user.id),
+                dbService.getResumes(user.id)
+            ]);
+
+            setProfile(profileData);
+            setResumes(resumesData || []);
+            
+            // Select active resume by default if available
+            if (resumesData && resumesData.length > 0) {
+                const active = resumesData.find(r => r.is_active) || resumesData[0];
+                setSelectedResumeId(active.id);
+            }
         } catch (err) {
-            console.error(err);
+            console.error('Error fetching data:', err);
         } finally {
             setLoading(false);
         }
@@ -75,13 +90,22 @@ export default function ResumeTailor() {
         setTailoring(true);
         try {
             const session = await authService.getSession();
-            const resumeData = {
-                profile,
-                work_experience: profile.work_experience,
-                education: profile.education,
-                projects: profile.projects,
-                skills: profile.skills
-            };
+            
+            let resumeData;
+            const selectedResume = resumes.find(r => r.id === selectedResumeId);
+            
+            if (selectedResume && selectedResume.content) {
+                resumeData = selectedResume.content;
+            } else {
+                // Fallback to profile
+                resumeData = {
+                    profile,
+                    work_experience: profile?.work_experience || [],
+                    education: profile?.education || [],
+                    projects: profile?.projects || [],
+                    skills: profile?.skills || ''
+                };
+            }
 
             const response = await fetch('/api/tailor-resume', {
                 method: 'POST',
@@ -103,10 +127,36 @@ export default function ResumeTailor() {
             setStep(4); // Go to review
         } catch (error) {
             console.error(error);
-            alert('Failed to tailor resume');
+            alert('Failed to tailor resume: ' + error.message);
         } finally {
             setTailoring(false);
         }
+    };
+
+    const handleDownload = () => {
+        if (!tailoredResume) return;
+        
+        import('../lib/pdfGenerator').then(({ generateResumePDF }) => {
+            generateResumePDF(
+                tailoredResume.profile,
+                tailoredResume.work_experience || [],
+                tailoredResume.education || [],
+                tailoredResume.projects || [],
+                'professional'
+            );
+        });
+    };
+
+    const getOriginalData = () => {
+        const selected = resumes.find(r => r.id === selectedResumeId);
+        if (selected && selected.content) return selected.content;
+        return {
+            profile,
+            work_experience: profile?.work_experience || [],
+            education: profile?.education || [],
+            projects: profile?.projects || [],
+            skills: profile?.skills || ''
+        };
     };
 
     if (loading) return <div className="min-h-screen bg-black flex items-center justify-center"><Loader /></div>;
@@ -160,25 +210,69 @@ export default function ResumeTailor() {
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                {/* Current Resume Card */}
-                                <div 
-                                    className="bg-[#1a1a1a] border-2 border-orange-500 rounded-xl p-6 relative cursor-pointer hover:shadow-lg hover:shadow-orange-500/10 transition-all group"
-                                    onClick={() => setStep(2)}
-                                >
-                                    <div className="absolute top-4 right-4 bg-orange-500 text-white text-xs px-2 py-1 rounded font-bold">SELECTED</div>
-                                    <div className="w-full aspect-[8.5/11] bg-white rounded mb-4 overflow-hidden opacity-80 group-hover:opacity-100 transition-opacity">
-                                        <div className="w-full h-full bg-neutral-200 flex items-center justify-center text-neutral-400 text-4xl">📄</div>
+                                {resumes.length > 0 ? resumes.map(res => (
+                                    <div 
+                                        key={res.id}
+                                        className={`bg-[#1a1a1a] border-2 rounded-xl p-6 relative cursor-pointer hover:shadow-lg transition-all group ${
+                                            selectedResumeId === res.id ? 'border-orange-500 shadow-orange-500/10' : 'border-neutral-800'
+                                        }`}
+                                        onClick={() => {
+                                            setSelectedResumeId(res.id);
+                                            setStep(2);
+                                        }}
+                                    >
+                                        {selectedResumeId === res.id && (
+                                            <div className="absolute top-4 right-4 bg-orange-500 text-white text-xs px-2 py-1 rounded font-bold">SELECTED</div>
+                                        )}
+                                        <div className="w-full aspect-[8.5/11] bg-white rounded mb-4 overflow-hidden opacity-80 group-hover:opacity-100 transition-opacity flex flex-col p-4 text-[4px] text-black">
+                                            <div className="font-bold text-[8px] mb-1">{res.content?.profile?.full_name || res.title}</div>
+                                            <div className="w-full h-1 bg-neutral-200 mb-1"></div>
+                                            <div className="w-2/3 h-1 bg-neutral-200 mb-2"></div>
+                                            <div className="space-y-1">
+                                                <div className="w-full h-0.5 bg-neutral-100"></div>
+                                                <div className="w-full h-0.5 bg-neutral-100"></div>
+                                                <div className="w-3/4 h-0.5 bg-neutral-100"></div>
+                                            </div>
+                                        </div>
+                                        <h3 className="font-bold text-white text-lg truncate">{res.title}</h3>
+                                        <p className="text-sm text-neutral-500">
+                                            {new Date(res.updated_at).toLocaleDateString()}
+                                        </p>
                                     </div>
-                                    <h3 className="font-bold text-white text-lg">{profile?.full_name || 'My Resume'}</h3>
-                                    <p className="text-sm text-neutral-500">Last modified: Today</p>
-                                </div>
+                                )) : (
+                                    /* Fallback to Profile if no resumes */
+                                    <div 
+                                        className={`bg-[#1a1a1a] border-2 rounded-xl p-6 relative cursor-pointer hover:shadow-lg transition-all group ${
+                                            !selectedResumeId ? 'border-orange-500 shadow-orange-500/10' : 'border-neutral-800'
+                                        }`}
+                                        onClick={() => {
+                                            setSelectedResumeId(null);
+                                            setStep(2);
+                                        }}
+                                    >
+                                        <div className="absolute top-4 right-4 bg-blue-500 text-white text-xs px-2 py-1 rounded font-bold">FROM PROFILE</div>
+                                        <div className="w-full aspect-[8.5/11] bg-white rounded mb-4 overflow-hidden opacity-80 group-hover:opacity-100 transition-opacity flex flex-col p-4 text-[4px] text-black">
+                                            <div className="font-bold text-[8px] mb-1">{profile?.full_name || 'My Profile'}</div>
+                                            <div className="w-full h-1 bg-neutral-200 mb-4"></div>
+                                            <div className="space-y-1">
+                                                <div className="w-full h-0.5 bg-neutral-100"></div>
+                                                <div className="w-full h-0.5 bg-neutral-100"></div>
+                                            </div>
+                                        </div>
+                                        <h3 className="font-bold text-white text-lg">{profile?.full_name || 'My Profile'}</h3>
+                                        <p className="text-sm text-neutral-500">Default Data</p>
+                                    </div>
+                                )}
 
                                 {/* Placeholder for Upload */}
-                                <div className="bg-[#111] border border-neutral-800 border-dashed rounded-xl p-6 flex flex-col items-center justify-center gap-4 cursor-pointer hover:bg-[#151515] transition-colors">
+                                <div 
+                                    onClick={() => window.location.href = '/versions'}
+                                    className="bg-[#111] border border-neutral-800 border-dashed rounded-xl p-6 flex flex-col items-center justify-center gap-4 cursor-pointer hover:bg-[#151515] transition-colors"
+                                >
                                     <div className="w-16 h-16 bg-neutral-800 rounded-full flex items-center justify-center text-2xl">⬆️</div>
                                     <div className="text-center">
                                         <h3 className="font-bold text-white">Upload New</h3>
-                                        <p className="text-sm text-neutral-500">PDF or DOCX</p>
+                                        <p className="text-sm text-neutral-500">Go to Resume Manager</p>
                                     </div>
                                 </div>
                             </div>
@@ -360,12 +454,59 @@ export default function ResumeTailor() {
                                         <span className="font-bold text-neutral-400">Original Version 🔒</span>
                                     </div>
                                     <div className="flex-1 p-8 overflow-y-auto bg-white text-black text-xs opacity-70">
-                                        {/* Mock preview of original text content */}
-                                        <h1 className="text-2xl font-bold mb-4">{profile?.full_name}</h1>
-                                        <p className="mb-4">Senior Software Engineer</p>
-                                        <hr className="my-4"/>
-                                        <p>{profile?.professional_summary}</p>
-                                        {/* ... render more ... */}
+                                        {/* Full preview of original content */}
+                                        {(() => {
+                                            const original = getOriginalData();
+                                            return (
+                                                <div className="space-y-6">
+                                                    <div>
+                                                        <h1 className="text-2xl font-bold mb-1">{original.profile?.full_name}</h1>
+                                                        <p className="text-gray-600 mb-4">{original.profile?.location} • {original.profile?.email}</p>
+                                                        <h2 className="text-sm font-bold uppercase border-b border-gray-300 mb-2 pb-1">Professional Summary</h2>
+                                                        <p className="leading-relaxed">{original.profile?.professional_summary}</p>
+                                                    </div>
+
+                                                    {original.work_experience?.length > 0 && (
+                                                        <div>
+                                                            <h2 className="text-sm font-bold uppercase border-b border-gray-300 mb-3 pb-1">Work Experience</h2>
+                                                            <div className="space-y-4">
+                                                                {original.work_experience.map((exp, i) => (
+                                                                    <div key={i}>
+                                                                        <div className="flex justify-between font-bold">
+                                                                            <span>{exp.position}</span>
+                                                                            <span>{exp.start_date} - {exp.end_date}</span>
+                                                                        </div>
+                                                                        <div className="text-gray-600 italic mb-1">{exp.company}</div>
+                                                                        <ul className="list-disc ml-4 space-y-1">
+                                                                            {(exp.description || '').split('|').map((bullet, j) => (
+                                                                                <li key={j}>{bullet.trim()}</li>
+                                                                            ))}
+                                                                        </ul>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {original.education?.length > 0 && (
+                                                        <div>
+                                                            <h2 className="text-sm font-bold uppercase border-b border-gray-300 mb-3 pb-1">Education</h2>
+                                                            <div className="space-y-2">
+                                                                {original.education.map((edu, i) => (
+                                                                    <div key={i}>
+                                                                        <div className="flex justify-between font-bold">
+                                                                            <span>{edu.institution || edu.school}</span>
+                                                                            <span>{edu.graduation_date}</span>
+                                                                        </div>
+                                                                        <div>{edu.degree}</div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })()}
                                     </div>
                                 </div>
 
@@ -374,10 +515,15 @@ export default function ResumeTailor() {
                                     <div className="p-4 border-b border-neutral-800 flex justify-between items-center bg-[#111]">
                                         <span className="font-bold text-white flex items-center gap-2">
                                             Tailored Version ✨ 
-                                            <span className="bg-green-500 text-black text-xs px-2 py-0.5 rounded font-bold">Match: 95%</span>
+                                            <span className="bg-green-500 text-black text-xs px-2 py-0.5 rounded font-bold">Match: {tailoredResume?.match_score || 95}%</span>
                                         </span>
                                         <div className="flex gap-2">
-                                            <button className="px-3 py-1 bg-white text-black text-xs font-bold rounded hover:bg-neutral-200">Download</button>
+                                            <button 
+                                                onClick={handleDownload}
+                                                className="px-3 py-1 bg-white text-black text-xs font-bold rounded hover:bg-neutral-200 transition-colors"
+                                            >
+                                                Download PDF
+                                            </button>
                                         </div>
                                     </div>
                                     <div className="flex-1 p-8 overflow-y-auto bg-white text-black text-xs relative">

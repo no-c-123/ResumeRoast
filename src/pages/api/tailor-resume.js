@@ -205,6 +205,8 @@ TASK: Tailor this resume specifically for the job description above. Rewrite sec
 6. Modify work experience descriptions to use terminology from the job description where appropriate
 
 IMPORTANT RULES:
+- **PRESERVE ALL DATES**: You MUST keep all start dates, end dates, and graduation dates EXACTLY as they are in the original data. Do NOT change "Present" to a specific date, and do NOT change years or months.
+- **PRESERVE INSTITUTION NAMES**: You MUST keep all company names and institution names EXACTLY as they are in the original data. Do NOT replace them with generic names like "School".
 - Keep all actual experience and facts - don't make up fake accomplishments
 - Use "|" as separator between bullet points in work experience descriptions
 - Maintain professional tone and accuracy

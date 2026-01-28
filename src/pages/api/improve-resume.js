@@ -189,6 +189,8 @@ INSTRUCTIONS:
 6. **Overall**: Fix grammar, spelling, formatting issues, and ensure professional tone throughout
 
 IMPORTANT RULES:
+- **PRESERVE ALL DATES**: You MUST keep all start dates, end dates, and graduation dates EXACTLY as they are in the original data. Do NOT change "Present" to a specific date, and do NOT change years or months.
+- **PRESERVE INSTITUTION NAMES**: You MUST keep all company names and institution names EXACTLY as they are in the original data. Do NOT replace them with generic names like "School".
 - Keep the person's actual experience and facts - don't make up fake accomplishments
 - If they lack quantified metrics, suggest improvement like "managed inventory system" → "managed inventory system for 50+ units"
 - For limited experience, suggest adding relevant coursework, personal projects, or certifications
