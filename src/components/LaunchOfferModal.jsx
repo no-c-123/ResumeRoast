@@ -37,11 +37,8 @@ export default function LaunchOfferModal() {
 
     useEffect(() => {
         // Show after a small delay for impact, if not already seen in session
-        // const hasSeen = sessionStorage.getItem('hasSeenLaunchOffer');
+        const hasSeen = sessionStorage.getItem('hasSeenLaunchOffer');
         
-        // FOR DEBUGGING: Force show for testing purposes
-        const hasSeen = false; 
-
         if (!hasSeen) {
             const timer = setTimeout(() => setIsOpen(true), 2000);
             return () => clearTimeout(timer);
@@ -50,6 +47,7 @@ export default function LaunchOfferModal() {
 
     const handleClaim = () => {
         sessionStorage.setItem('hasSeenLaunchOffer', 'true');
+        sessionStorage.setItem('claimedOffer', 'true');
         setIsOpen(false);
         window.location.href = '/login?signup=true&offer=1monthfree';
     };

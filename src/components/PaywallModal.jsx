@@ -6,8 +6,15 @@ const ProductDisplay = ({ initialTab }) => {
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedTab, setSelectedTab] = useState(initialTab || 'pro');
+  const [offer, setOffer] = useState(null);
 
   useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    if (searchParams.get('offer') === '1monthfree') {
+        setOffer('1monthfree');
+        setSelectedTab('pro');
+    }
+
     async function fetchPlans() {
       try {
         const res = await fetch('/api/plans');
@@ -75,8 +82,20 @@ const ProductDisplay = ({ initialTab }) => {
           <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" className="inline-block align-middle"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
           Back
         </button>
+
+        {offer === '1monthfree' && (
+            <div className="mt-8 mb-4 bg-orange-500/10 border border-orange-500/30 rounded-lg p-3 text-center">
+                <p className="text-orange-400 text-sm font-bold">
+                    🎉 1 Month Free Trial Activated!
+                </p>
+                <p className="text-neutral-400 text-xs mt-1">
+                    Subscribe now and your first month is on us.
+                </p>
+            </div>
+        )}
+
         {/* Tabs */}
-        <div className="flex justify-center gap-2 mb-8 pt-8">
+        <div className={`flex justify-center gap-2 mb-8 ${offer ? 'pt-2' : 'pt-8'}`}>
           {plans.map(p => (
             <button
                 key={p.key}

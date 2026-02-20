@@ -85,7 +85,13 @@ export const POST = async ({ request }) => {
       };
     }
     if (mode === 'subscription') {
-      sessionParams.subscription_data = { trial_period_days: 7 };
+      const currentDate = new Date();
+      const offerEndDate = new Date('2026-03-07T23:59:59'); // Offer ends March 7, 2026
+      
+      // Default to 7 days, but upgrade to 30 days if within offer window
+      const trialDays = currentDate < offerEndDate ? 30 : 7;
+      
+      sessionParams.subscription_data = { trial_period_days: trialDays };
     }
     if (!priceId && lookupKey) {
       const prices = await stripe.prices.list({
