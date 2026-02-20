@@ -107,6 +107,78 @@ export const generateResumePDF = (profile, workExperience, education, projects, 
         y += 10;
     }
 
+    // --- Education (Moved to Top) ---
+    if (education.length > 0) {
+        checkPageBreak(20);
+        if (selectedTemplate === 'ivy') {
+            doc.setFontSize(10);
+            doc.setFont(fontName, 'bold');
+            doc.setTextColor('#000000');
+            doc.text('EDUCATION', margin, y);
+            y += 2;
+            doc.setDrawColor(0, 0, 0);
+            doc.line(margin, y, pageWidth - margin, y);
+            y += 5;
+        } else {
+            printText('EDUCATION', 12, true, 'left', accentColor);
+        }
+        
+        education.forEach(edu => {
+            if (!edu.school && !edu.degree) return;
+            checkPageBreak(25);
+            
+            if (selectedTemplate === 'ivy') {
+                // School Name First for Ivy
+                 doc.setFontSize(11);
+                doc.setFont(fontName, 'bold');
+                doc.setTextColor('#000000');
+                doc.text(edu.school || 'School', margin, y);
+
+                const dateStr = formatDateRange(edu.start_date, edu.end_date, edu.current);
+                doc.text(dateStr, pageWidth - margin, y, { align: 'right' });
+                y += 5;
+
+                // Degree
+                doc.setFontSize(10);
+                doc.setFont(fontName, 'normal'); // Normal for degree
+                doc.text(edu.degree || '', margin, y);
+                
+                if (edu.location) {
+                    doc.text(edu.location, pageWidth - margin, y, { align: 'right' });
+                }
+                y += 6;
+
+            } else {
+                // Degree First for others
+                doc.setFontSize(11);
+                doc.setFont(fontName, 'bold');
+                doc.setTextColor('#000000');
+                doc.text(edu.degree || 'Degree', margin, y);
+                
+                // Date
+                const dateStr = formatDateRange(edu.start_date, edu.end_date, edu.current);
+                doc.setFont(fontName, 'normal');
+                doc.setFontSize(10);
+                doc.setTextColor('#666666');
+                doc.text(dateStr, pageWidth - margin, y, { align: 'right' });
+                
+                y += 5;
+                
+                // School
+                doc.setFontSize(10);
+                doc.setFont(fontName, 'italic');
+                doc.setTextColor('#444444');
+                doc.text(edu.school || '', margin, y);
+                y += 6;
+            }
+            
+            if (edu.field) {
+                printText(edu.field, 10, false);
+            }
+            y += 3;
+        });
+    }
+
     // --- Summary ---
     if (profile.professional_summary) {
         checkPageBreak(20);
@@ -205,78 +277,6 @@ export const generateResumePDF = (profile, workExperience, education, projects, 
             // Description
             if (exp.description) {
                 printText(exp.description, 10, false);
-            }
-            y += 3;
-        });
-    }
-
-    // --- Education ---
-    if (education.length > 0) {
-        checkPageBreak(20);
-        if (selectedTemplate === 'ivy') {
-            doc.setFontSize(10);
-            doc.setFont(fontName, 'bold');
-            doc.setTextColor('#000000');
-            doc.text('EDUCATION', margin, y);
-            y += 2;
-            doc.setDrawColor(0, 0, 0);
-            doc.line(margin, y, pageWidth - margin, y);
-            y += 5;
-        } else {
-            printText('EDUCATION', 12, true, 'left', accentColor);
-        }
-        
-        education.forEach(edu => {
-            if (!edu.school && !edu.degree) return;
-            checkPageBreak(25);
-            
-            if (selectedTemplate === 'ivy') {
-                // School Name First for Ivy
-                 doc.setFontSize(11);
-                doc.setFont(fontName, 'bold');
-                doc.setTextColor('#000000');
-                doc.text(edu.school || 'School', margin, y);
-
-                const dateStr = formatDateRange(edu.start_date, edu.end_date, edu.current);
-                doc.text(dateStr, pageWidth - margin, y, { align: 'right' });
-                y += 5;
-
-                // Degree
-                doc.setFontSize(10);
-                doc.setFont(fontName, 'normal'); // Normal for degree
-                doc.text(edu.degree || '', margin, y);
-                
-                if (edu.location) {
-                    doc.text(edu.location, pageWidth - margin, y, { align: 'right' });
-                }
-                y += 6;
-
-            } else {
-                // Degree First for others
-                doc.setFontSize(11);
-                doc.setFont(fontName, 'bold');
-                doc.setTextColor('#000000');
-                doc.text(edu.degree || 'Degree', margin, y);
-                
-                // Date
-                const dateStr = formatDateRange(edu.start_date, edu.end_date, edu.current);
-                doc.setFont(fontName, 'normal');
-                doc.setFontSize(10);
-                doc.setTextColor('#666666');
-                doc.text(dateStr, pageWidth - margin, y, { align: 'right' });
-                
-                y += 5;
-                
-                // School
-                doc.setFontSize(10);
-                doc.setFont(fontName, 'italic');
-                doc.setTextColor('#444444');
-                doc.text(edu.school || '', margin, y);
-                y += 6;
-            }
-            
-            if (edu.field) {
-                printText(edu.field, 10, false);
             }
             y += 3;
         });

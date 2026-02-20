@@ -113,6 +113,7 @@ export default function ResumeAnalyzer({ initialAnalysisId }) {
         analysisData,
         fixing,
         fixedData,
+        changesMade,
         isDownloading, setIsDownloading,
         startAnalysis,
         handleApplyFix,
@@ -124,6 +125,7 @@ export default function ResumeAnalyzer({ initialAnalysisId }) {
     const [expandedIssues, setExpandedIssues] = useState({});
     const [selectedTemplate, setSelectedTemplate] = useState('ivy');
     const [zoom, setZoom] = useState(50);
+    const [targetLanguage, setTargetLanguage] = useState('English');
     const fileInputRef = useRef(null);
 
     // Load existing analysis if provided
@@ -160,7 +162,7 @@ export default function ResumeAnalyzer({ initialAnalysisId }) {
             `Fix critical issue: ${issue.title} - ${issue.description}. ${issue.fix}`
         ).join('\n');
         
-        handleApplyFix('bulk', instructions);
+        handleApplyFix('bulk', instructions, { targetLanguage });
     };
 
     const handleDownload = async () => {
@@ -318,7 +320,22 @@ export default function ResumeAnalyzer({ initialAnalysisId }) {
                                 {activeTab === 'critical' && (
                                     <>
                                         {analysisData.critical.length > 0 && (
-                                            <div className="mb-6 flex justify-end">
+                                            <div className="mb-6 flex justify-end items-center gap-4">
+                                                <div className="flex items-center gap-2 bg-[#1a1a1a] px-3 py-2 rounded-lg border border-neutral-800">
+                                                    <span className="text-neutral-400 text-xs">Output Language:</span>
+                                                    <select 
+                                                        value={targetLanguage}
+                                                        onChange={(e) => setTargetLanguage(e.target.value)}
+                                                        className="bg-transparent text-white text-sm font-bold outline-none cursor-pointer"
+                                                    >
+                                                        <option value="English">English 🇺🇸</option>
+                                                        <option value="Spanish">Spanish 🇪🇸</option>
+                                                        <option value="French">French 🇫🇷</option>
+                                                        <option value="German">German 🇩🇪</option>
+                                                        <option value="Italian">Italian 🇮🇹</option>
+                                                        <option value="Portuguese">Portuguese 🇵🇹</option>
+                                                    </select>
+                                                </div>
                                                 <button 
                                                     onClick={handleBulkFix}
                                                     disabled={fixing !== null}
@@ -363,7 +380,7 @@ export default function ResumeAnalyzer({ initialAnalysisId }) {
                                                             <span className="text-white font-bold">{issue.time}</span>
                                                         </div>
                                                         <button 
-                                                            onClick={() => handleApplyFix('critical', `Fix this critical issue: ${issue.title} - ${issue.description}. ${issue.fix}`)}
+                                                            onClick={() => handleApplyFix('critical', `Fix this critical issue: ${issue.title} - ${issue.description}. ${issue.fix}`, { targetLanguage })}
                                                             disabled={fixing !== null}
                                                             className="w-full mt-4 py-2 bg-white text-black font-bold text-sm rounded hover:bg-neutral-200 transition-colors disabled:opacity-50"
                                                         >
@@ -435,14 +452,37 @@ export default function ResumeAnalyzer({ initialAnalysisId }) {
                                 >
                                     <div className="flex items-center justify-between mb-6">
                                         <h3 className="text-2xl font-bold text-white">✨ Improved Resume Preview</h3>
-                                        <button 
-                                            onClick={handleDownload}
-                                            disabled={isDownloading}
-                                            className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-600 rounded-lg font-bold text-white shadow-lg hover:shadow-green-500/20 transition-all disabled:opacity-50"
-                                        >
-                                            {isDownloading ? 'Generating PDF...' : 'Download Improved PDF'}
-                                        </button>
+                                        <div className="flex gap-4">
+                                            {changesMade && changesMade.length > 0 && (
+                                                <div className="flex items-center bg-green-500/20 text-green-400 text-xs font-bold px-3 py-1 rounded border border-green-500/30">
+                                                    {changesMade.length} Changes Applied
+                                                </div>
+                                            )}
+                                            <button 
+                                                onClick={handleDownload}
+                                                disabled={isDownloading}
+                                                className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-600 rounded-lg font-bold text-white shadow-lg hover:shadow-green-500/20 transition-all disabled:opacity-50"
+                                            >
+                                                {isDownloading ? 'Generating PDF...' : 'Download Improved PDF'}
+                                            </button>
+                                        </div>
                                     </div>
+
+                                    {changesMade && changesMade.length > 0 && (
+                                        <div className="mb-6 bg-green-500/5 border border-green-500/20 rounded-xl p-4">
+                                            <h4 className="text-green-400 font-bold mb-2 flex items-center gap-2 text-sm">
+                                                <span>✨</span> AI Optimization Log
+                                            </h4>
+                                            <ul className="grid grid-cols-1 gap-2">
+                                                {changesMade.map((note, i) => (
+                                                    <li key={i} className="text-xs text-neutral-300 flex items-start gap-2">
+                                                        <span className="text-green-500 mt-0.5">•</span>
+                                                        {note}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
 
                                     <div className="bg-white text-black p-8 rounded-xl shadow-2xl relative overflow-hidden min-h-[600px]">
                                         <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-green-400 to-blue-500"></div>

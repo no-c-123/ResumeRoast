@@ -4,6 +4,7 @@ import { dbService, authService } from '../services/supabase';
 import Loader from './uicomponents/Loader';
 import { renderTemplate } from './ResumeTemplates.jsx';
 import { generateResumePDF } from '../lib/pdfGenerator';
+import { diffStrings } from '../utils/diff';
 
 import { motion } from 'framer-motion';
 
@@ -25,6 +26,7 @@ export default function ResumeScorer() {
     const [selectedIssues, setSelectedIssues] = useState([]);
     const [changesMade, setChangesMade] = useState([]);
     const [targetLanguage, setTargetLanguage] = useState('English');
+    const [showDiff, setShowDiff] = useState(true);
 
     useEffect(() => {
         fetchProfile();
@@ -222,6 +224,50 @@ export default function ResumeScorer() {
         } finally {
             setIsDownloading(false);
         }
+    };
+
+    const getDisplayData = () => {
+        if (!showDiff || !fixedData || !profile) return fixedData;
+        
+        const diffData = JSON.parse(JSON.stringify(fixedData)); // Deep copy
+        
+        // Diff Summary
+        if (diffData.profile?.professional_summary && profile.professional_summary) {
+            diffData.profile.professional_summary = diffStrings(profile.professional_summary, diffData.profile.professional_summary);
+        }
+        
+        // Diff Work Experience
+        if (diffData.work_experience && profile.work_experience) {
+            diffData.work_experience = diffData.work_experience.map((exp, i) => {
+                // Try to find matching old experience by ID or loose match
+                const oldExp = profile.work_experience.find(e => e.id === exp.id) || profile.work_experience[i];
+                
+                if (oldExp && (oldExp.company === exp.company || oldExp.position === exp.position)) {
+                    return {
+                        ...exp,
+                        description: diffStrings(oldExp.description, exp.description)
+                    };
+                }
+                return exp;
+            });
+        }
+        
+        // Diff Projects
+        if (diffData.projects && profile.projects) {
+            diffData.projects = diffData.projects.map((proj, i) => {
+                const oldProj = profile.projects.find(p => p.id === proj.id) || profile.projects[i];
+                
+                if (oldProj && oldProj.title === proj.title) {
+                    return {
+                        ...proj,
+                        description: diffStrings(oldProj.description, proj.description)
+                    };
+                }
+                return proj;
+            });
+        }
+        
+        return diffData;
     };
 
     if (loading) return <div className="min-h-screen bg-black flex items-center justify-center"><Loader /></div>;
@@ -622,24 +668,34 @@ export default function ResumeScorer() {
                                 id="improved-resume-preview"
                             >
                                 <div className="flex items-center justify-between mb-6">
-                                    <h3 className="text-2xl font-bold text-white">✨ Improved Resume Preview</h3>
-                                    <div className="flex gap-4">
-                                        {changesMade.length > 0 && (
-                                            <div className="flex -space-x-2 overflow-hidden">
-                                                <div className="bg-green-500/20 text-green-400 text-[10px] font-bold px-2 py-1 rounded border border-green-500/30">
-                                                    {changesMade.length} Changes Made
-                                                </div>
+                                        <h3 className="text-2xl font-bold text-white">✨ Improved Resume Preview</h3>
+                                        <div className="flex items-center gap-4">
+                                            <div className="flex items-center gap-2">
+                                                <label className="text-sm text-neutral-400 font-bold">Show Changes</label>
+                                                <button 
+                                                    onClick={() => setShowDiff(!showDiff)}
+                                                    className={`w-12 h-6 rounded-full p-1 transition-colors ${showDiff ? 'bg-green-500' : 'bg-neutral-700'}`}
+                                                >
+                                                    <div className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${showDiff ? 'translate-x-6' : 'translate-x-0'}`} />
+                                                </button>
                                             </div>
-                                        )}
-                                        <button 
-                                            onClick={handleDownload}
-                                            disabled={isDownloading}
-                                            className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-600 rounded-lg font-bold text-white shadow-lg hover:shadow-green-500/20 transition-all disabled:opacity-50"
-                                        >
-                                            {isDownloading ? 'Generating PDF...' : 'Download Improved PDF'}
-                                        </button>
+
+                                            {changesMade.length > 0 && (
+                                                <div className="flex -space-x-2 overflow-hidden">
+                                                    <div className="bg-green-500/20 text-green-400 text-[10px] font-bold px-2 py-1 rounded border border-green-500/30">
+                                                        {changesMade.length} Changes Made
+                                                    </div>
+                                                </div>
+                                            )}
+                                            <button 
+                                                onClick={handleDownload}
+                                                disabled={isDownloading}
+                                                className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-600 rounded-lg font-bold text-white shadow-lg hover:shadow-green-500/20 transition-all disabled:opacity-50"
+                                            >
+                                                {isDownloading ? 'Generating PDF...' : 'Download Improved PDF'}
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
 
                                 {changesMade.length > 0 && (
                                     <div className="mb-8 bg-green-500/5 border border-green-500/20 rounded-xl p-6">
@@ -665,13 +721,13 @@ export default function ResumeScorer() {
                                         {renderTemplate({
                                             selectedTemplate: 'ivy',
                                             templates: [{ id: 'ivy', name: 'Ivy League', font: 'Times New Roman, serif', color: '#000000' }],
-                                            profile: fixedData.profile || {},
-                                            hasWorkExperience: (fixedData.work_experience || []).length > 0,
-                                            workExperience: fixedData.work_experience || [],
-                                            hasEducation: (fixedData.education || []).length > 0,
-                                            education: fixedData.education || [],
-                                            hasProjects: (fixedData.projects || []).length > 0,
-                                            projects: fixedData.projects || []
+                                            profile: getDisplayData().profile || {},
+                                            hasWorkExperience: (getDisplayData().work_experience || []).length > 0,
+                                            workExperience: getDisplayData().work_experience || [],
+                                            hasEducation: (getDisplayData().education || []).length > 0,
+                                            education: getDisplayData().education || [],
+                                            hasProjects: (getDisplayData().projects || []).length > 0,
+                                            projects: getDisplayData().projects || []
                                         })}
                                     </div>
                                 </div>

@@ -10,6 +10,7 @@ export function useResumeAnalysis(initialAnalysisId, user) {
     const [resumeText, setResumeText] = useState('');
     const [fixing, setFixing] = useState(null);
     const [fixedData, setFixedData] = useState(null);
+    const [changesMade, setChangesMade] = useState([]);
     const [isDownloading, setIsDownloading] = useState(false);
     const [error, setError] = useState(null);
 
@@ -152,7 +153,7 @@ export function useResumeAnalysis(initialAnalysisId, user) {
         }
     };
 
-    const handleApplyFix = async (fixType, instructions) => {
+    const handleApplyFix = async (fixType, instructions, options = {}) => {
         if (!user) return;
         setFixing(fixType);
         try {
@@ -168,7 +169,8 @@ export function useResumeAnalysis(initialAnalysisId, user) {
                     userId: user.id,
                     resumeData: fixedData, 
                     resumeText: resumeText,
-                    customInstructions: instructions
+                    customInstructions: instructions,
+                    targetLanguage: options.targetLanguage || 'English'
                 })
             });
 
@@ -176,6 +178,7 @@ export function useResumeAnalysis(initialAnalysisId, user) {
             
             if (data.success && data.improved_resume) {
                 setFixedData(data.improved_resume);
+                setChangesMade(data.changes_made || []);
                 return data;
             } else {
                 throw new Error(data.error || 'Failed to apply fix');
@@ -197,6 +200,7 @@ export function useResumeAnalysis(initialAnalysisId, user) {
         resumeText,
         fixing,
         fixedData,
+        changesMade,
         isDownloading, setIsDownloading,
         error,
         startAnalysis,

@@ -107,7 +107,7 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                 {profile.professional_summary && (
                     <div className="mb-5">
                         <h2 className="text-lg font-bold mb-2 uppercase tracking-wide" style={{ color: accentColor }}>Professional Summary</h2>
-                        <p className="text-neutral-800 text-sm leading-relaxed">{profile.professional_summary}</p>
+                        <p className="text-neutral-800 text-sm leading-relaxed" dangerouslySetInnerHTML={{ __html: profile.professional_summary }} />
                     </div>
                 )}
 
@@ -154,7 +154,7 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                                     </div>
                                     <p className="text-sm text-neutral-700 mb-2 font-medium">{exp.company}</p>
                                     {exp.description && (
-                                        <p className="text-sm text-neutral-800 leading-relaxed whitespace-pre-line">{exp.description}</p>
+                                        <p className="text-sm text-neutral-800 leading-relaxed whitespace-pre-line" dangerouslySetInnerHTML={{ __html: exp.description }} />
                                     )}
                                 </div>
                             ) : null
@@ -176,7 +176,7 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                                         </h3>
                                     </div>
                                     {p.tech && <p className="text-sm text-neutral-700 mb-1">{p.tech}</p>}
-                                    {p.description && <p className="text-sm text-neutral-800 leading-relaxed whitespace-pre-line">{p.description}</p>}
+                                    {p.description && <p className="text-sm text-neutral-800 leading-relaxed whitespace-pre-line" dangerouslySetInnerHTML={{ __html: p.description }} />}
                                 </div>
                             ) : null
                         ))}
