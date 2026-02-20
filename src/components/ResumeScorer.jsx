@@ -24,6 +24,7 @@ export default function ResumeScorer() {
     const [showResumeSelector, setShowResumeSelector] = useState(false);
     const [selectedIssues, setSelectedIssues] = useState([]);
     const [changesMade, setChangesMade] = useState([]);
+    const [targetLanguage, setTargetLanguage] = useState('English');
 
     useEffect(() => {
         fetchProfile();
@@ -141,7 +142,8 @@ export default function ResumeScorer() {
                 body: JSON.stringify({
                     userId: user.id,
                     resumeData: currentResume,
-                    customInstructions: Array.isArray(instructions) ? instructions.join('\n') : instructions
+                    customInstructions: Array.isArray(instructions) ? instructions.join('\n') : instructions,
+                    targetLanguage
                 })
             });
 
@@ -282,6 +284,22 @@ export default function ResumeScorer() {
                                 className="w-full h-32 bg-[#111] border border-neutral-800 rounded-lg p-3 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-pink-500 resize-none"
                             />
                         </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 mb-6 bg-[#1a1a1a] px-4 py-2 rounded-lg border border-neutral-800">
+                        <span className="text-neutral-400 text-sm">Output Language:</span>
+                        <select 
+                            value={targetLanguage}
+                            onChange={(e) => setTargetLanguage(e.target.value)}
+                            className="bg-transparent text-white font-bold outline-none cursor-pointer"
+                        >
+                            <option value="English">English 🇺🇸</option>
+                            <option value="Spanish">Spanish 🇪🇸</option>
+                            <option value="French">French 🇫🇷</option>
+                            <option value="German">German 🇩🇪</option>
+                            <option value="Italian">Italian 🇮🇹</option>
+                            <option value="Portuguese">Portuguese 🇵🇹</option>
+                        </select>
                     </div>
 
                     <button

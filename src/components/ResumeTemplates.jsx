@@ -27,6 +27,37 @@ const formatDateRange = (startDate, endDate, isCurrent) => {
     return end;
 };
 
+const parseSkills = (skillsString) => {
+    if (!skillsString) return null;
+    
+    // Check if it looks like structured data (contains colons for categories)
+    if (skillsString.includes(':')) {
+        const categories = {};
+        let isStructured = false;
+        
+        // Split by pipe separator used in SkillsEditor
+        const parts = skillsString.split('|');
+        
+        parts.forEach(part => {
+            const splitIndex = part.indexOf(':');
+            if (splitIndex !== -1) {
+                const label = part.substring(0, splitIndex).trim();
+                const content = part.substring(splitIndex + 1).trim();
+                if (label && content) {
+                    categories[label] = content;
+                    isStructured = true;
+                }
+            }
+        });
+
+        if (isStructured) {
+            return { type: 'structured', data: categories };
+        }
+    }
+    
+    return { type: 'flat', data: skillsString };
+};
+
 export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkExperience, workExperience, hasEducation, education, hasProjects, projects, customSections = [] }) => {
     const template = templates.find(t => t.id === selectedTemplate);
     const accentColor = template?.color || '#2563eb';
@@ -83,9 +114,26 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                 {profile.skills && (
                     <div className="mb-5">
                         <h2 className="text-lg font-bold mb-2 uppercase tracking-wide" style={{ color: accentColor }}>Skills</h2>
-                        <p className="text-neutral-800 text-sm leading-relaxed">
-                            {profile.skills.split(',').map(s => s.trim()).join(' • ')}
-                        </p>
+                        {(() => {
+                            const parsed = parseSkills(profile.skills);
+                            if (parsed.type === 'structured') {
+                                return (
+                                    <div className="text-neutral-800 text-sm leading-relaxed space-y-1">
+                                        {Object.entries(parsed.data).map(([cat, skills]) => (
+                                            <div key={cat}>
+                                                <span className="font-bold">{cat}: </span>
+                                                <span>{skills}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                );
+                            }
+                            return (
+                                <p className="text-neutral-800 text-sm leading-relaxed">
+                                    {parsed.data.split(',').map(s => s.trim()).join(' • ')}
+                                </p>
+                            );
+                        })()}
                     </div>
                 )}
 
@@ -144,7 +192,20 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                                     <h3 className="font-bold text-base text-neutral-900">{item.title}</h3>
                                     {item.subtitle && <span className="text-sm text-neutral-600">{item.subtitle}</span>}
                                 </div>
-                                {item.description && <p className="text-sm text-neutral-800 leading-relaxed whitespace-pre-line">{item.description}</p>}
+                                {item.description && (
+                                    <div className="text-sm text-neutral-800 leading-relaxed">
+                                        {item.description.includes('•') || item.description.includes('\n') ? (
+                                            <ul className="list-disc ml-5 space-y-1">
+                                                {item.description.split(/[\r\n]+/).map((line, i) => {
+                                                    const trimmed = line.trim().replace(/^•\s*/, '');
+                                                    return trimmed ? <li key={i}>{trimmed}</li> : null;
+                                                })}
+                                            </ul>
+                                        ) : (
+                                            <p className="whitespace-pre-line">{item.description}</p>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         ))}
                     </div>
@@ -238,9 +299,26 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                 {profile.skills && (
                     <div className="mb-6">
                         <h2 className="text-xl font-bold mb-3 pb-2 border-b-2" style={{ borderColor: accentColor }}>SKILLS</h2>
-                        <p className="text-neutral-800 text-sm leading-relaxed">
-                            {profile.skills.split(',').map(s => s.trim()).join(' • ')}
-                        </p>
+                        {(() => {
+                            const parsed = parseSkills(profile.skills);
+                            if (parsed.type === 'structured') {
+                                return (
+                                    <div className="text-neutral-800 text-sm leading-relaxed space-y-1">
+                                        {Object.entries(parsed.data).map(([cat, skills]) => (
+                                            <div key={cat}>
+                                                <span className="font-bold">{cat}: </span>
+                                                <span>{skills}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                );
+                            }
+                            return (
+                                <p className="text-neutral-800 text-sm leading-relaxed">
+                                    {parsed.data.split(',').map(s => s.trim()).join(' • ')}
+                                </p>
+                            );
+                        })()}
                     </div>
                 )}
 
@@ -274,7 +352,20 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                                     <h3 className="font-bold text-lg text-neutral-900">{item.title}</h3>
                                     {item.subtitle && <span className="text-sm text-neutral-600 italic">{item.subtitle}</span>}
                                 </div>
-                                {item.description && <p className="text-sm text-neutral-800 leading-relaxed whitespace-pre-line">{item.description}</p>}
+                                {item.description && (
+                                    <div className="text-sm text-neutral-800 leading-relaxed">
+                                        {item.description.includes('•') || item.description.includes('\n') ? (
+                                            <ul className="list-disc ml-5 space-y-1">
+                                                {item.description.split(/[\r\n]+/).map((line, i) => {
+                                                    const trimmed = line.trim().replace(/^•\s*/, '');
+                                                    return trimmed ? <li key={i}>{trimmed}</li> : null;
+                                                })}
+                                            </ul>
+                                        ) : (
+                                            <p className="whitespace-pre-line">{item.description}</p>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         ))}
                     </div>
@@ -364,7 +455,20 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                                     <h3 className="font-bold text-base text-neutral-900">{item.title}</h3>
                                     {item.subtitle && <span className="text-sm text-neutral-600">{item.subtitle}</span>}
                                 </div>
-                                {item.description && <p className="text-sm text-neutral-800 leading-relaxed whitespace-pre-line">{item.description}</p>}
+                                {item.description && (
+                                    <div className="text-sm text-neutral-800 leading-relaxed">
+                                        {item.description.includes('•') || item.description.includes('\n') ? (
+                                            <ul className="list-disc ml-5 space-y-1">
+                                                {item.description.split(/[\r\n]+/).map((line, i) => {
+                                                    const trimmed = line.trim().replace(/^•\s*/, '');
+                                                    return trimmed ? <li key={i}>{trimmed}</li> : null;
+                                                })}
+                                            </ul>
+                                        ) : (
+                                            <p className="whitespace-pre-line">{item.description}</p>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         ))}
                     </div>
@@ -373,9 +477,26 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                 {profile.skills && (
                     <div className="mb-5">
                         <h2 className="text-lg font-bold mb-2 tracking-wide" style={{ color: accentColor }}>CORE COMPETENCIES</h2>
-                        <div className="text-neutral-800 text-sm leading-relaxed">
-                            {profile.skills.split(',').map(s => s.trim()).join(' | ')}
-                        </div>
+                        {(() => {
+                            const parsed = parseSkills(profile.skills);
+                            if (parsed.type === 'structured') {
+                                return (
+                                    <div className="text-neutral-800 text-sm leading-relaxed space-y-1">
+                                        {Object.entries(parsed.data).map(([cat, skills]) => (
+                                            <div key={cat}>
+                                                <span className="font-bold">{cat}: </span>
+                                                <span>{skills}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                );
+                            }
+                            return (
+                                <div className="text-neutral-800 text-sm leading-relaxed">
+                                    {parsed.data.split(',').map(s => s.trim()).join(' | ')}
+                                </div>
+                            );
+                        })()}
                     </div>
                 )}
 
@@ -459,6 +580,32 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                     </div>
                 )}
 
+                {profile.skills && (
+                    <div className="mb-5">
+                        <h2 className="text-base font-bold mb-2 pb-1 border-b border-neutral-300">SKILLS</h2>
+                        {(() => {
+                            const parsed = parseSkills(profile.skills);
+                            if (parsed.type === 'structured') {
+                                return (
+                                    <div className="text-neutral-800 text-sm leading-relaxed space-y-1">
+                                        {Object.entries(parsed.data).map(([cat, skills]) => (
+                                            <div key={cat}>
+                                                <span className="font-bold">{cat}: </span>
+                                                <span>{skills}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                );
+                            }
+                            return (
+                                <p className="text-neutral-800 text-sm leading-relaxed">
+                                    {parsed.data.split(',').map(s => s.trim()).join(' • ')}
+                                </p>
+                            );
+                        })()}
+                    </div>
+                )}
+
                 {hasWorkExperience && workExperience && workExperience.length > 0 && workExperience.some(exp => exp && (exp.company || exp.position)) && (
                     <div className="mb-5">
                         <h2 className="text-base font-bold mb-2 pb-1 border-b border-neutral-300">EXPERIENCE</h2>
@@ -516,7 +663,20 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                                     <h3 className="font-bold text-base text-neutral-900">{item.title}</h3>
                                     {item.subtitle && <span className="text-sm text-neutral-600">{item.subtitle}</span>}
                                 </div>
-                                {item.description && <p className="text-sm text-neutral-800 leading-relaxed whitespace-pre-line">{item.description}</p>}
+                                {item.description && (
+                                    <div className="text-sm text-neutral-800 leading-relaxed">
+                                        {item.description.includes('•') || item.description.includes('\n') ? (
+                                            <ul className="list-disc ml-5 space-y-1">
+                                                {item.description.split(/[\r\n]+/).map((line, i) => {
+                                                    const trimmed = line.trim().replace(/^•\s*/, '');
+                                                    return trimmed ? <li key={i}>{trimmed}</li> : null;
+                                                })}
+                                            </ul>
+                                        ) : (
+                                            <p className="whitespace-pre-line">{item.description}</p>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         ))}
                     </div>
@@ -611,7 +771,20 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                                     <h3 className="font-semibold text-base text-neutral-900">{item.title}</h3>
                                     {item.subtitle && <span className="text-xs text-neutral-500">{item.subtitle}</span>}
                                 </div>
-                                {item.description && <p className="text-sm text-neutral-700 leading-relaxed whitespace-pre-line">{item.description}</p>}
+                                {item.description && (
+                                    <div className="text-sm text-neutral-700 leading-relaxed">
+                                        {item.description.includes('•') || item.description.includes('\n') ? (
+                                            <ul className="list-disc ml-5 space-y-1">
+                                                {item.description.split(/[\r\n]+/).map((line, i) => {
+                                                    const trimmed = line.trim().replace(/^•\s*/, '');
+                                                    return trimmed ? <li key={i}>{trimmed}</li> : null;
+                                                })}
+                                            </ul>
+                                        ) : (
+                                            <p className="whitespace-pre-line">{item.description}</p>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         ))}
                     </div>
@@ -620,9 +793,26 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                 {profile.skills && (
                     <div className="mb-6">
                         <h2 className="text-xs font-bold mb-3 uppercase tracking-widest text-neutral-500">Skills</h2>
-                        <p className="text-neutral-700 text-sm leading-relaxed">
-                            {profile.skills}
-                        </p>
+                        {(() => {
+                            const parsed = parseSkills(profile.skills);
+                            if (parsed.type === 'structured') {
+                                return (
+                                    <div className="text-neutral-700 text-sm leading-relaxed space-y-1">
+                                        {Object.entries(parsed.data).map(([cat, skills]) => (
+                                            <div key={cat}>
+                                                <span className="font-bold">{cat}: </span>
+                                                <span>{skills}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                );
+                            }
+                            return (
+                                <p className="text-neutral-700 text-sm leading-relaxed">
+                                    {parsed.data}
+                                </p>
+                            );
+                        })()}
                     </div>
                 )}
 
@@ -688,9 +878,26 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                 {profile.skills && (
                     <div className="mb-6">
                         <h2 className="text-lg font-bold mb-3" style={{ color: accentColor }}>Core Skills</h2>
-                        <p className="text-neutral-800 text-sm leading-relaxed">
-                            {profile.skills.split(',').map(s => s.trim()).join(' • ')}
-                        </p>
+                        {(() => {
+                            const parsed = parseSkills(profile.skills);
+                            if (parsed.type === 'structured') {
+                                return (
+                                    <div className="text-neutral-800 text-sm leading-relaxed space-y-1">
+                                        {Object.entries(parsed.data).map(([cat, skills]) => (
+                                            <div key={cat}>
+                                                <span className="font-bold">{cat}: </span>
+                                                <span>{skills}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                );
+                            }
+                            return (
+                                <p className="text-neutral-800 text-sm leading-relaxed">
+                                    {parsed.data.split(',').map(s => s.trim()).join(' • ')}
+                                </p>
+                            );
+                        })()}
                     </div>
                 )}
 
@@ -730,7 +937,20 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                                     <h3 className="font-bold text-base text-neutral-900">{item.title}</h3>
                                     {item.subtitle && <span className="text-sm text-neutral-600 italic">{item.subtitle}</span>}
                                 </div>
-                                {item.description && <p className="text-sm text-neutral-800 leading-relaxed whitespace-pre-line text-justify">{item.description}</p>}
+                                {item.description && (
+                                    <div className="text-sm text-neutral-800 leading-relaxed text-justify">
+                                        {item.description.includes('•') || item.description.includes('\n') ? (
+                                            <ul className="list-disc ml-5 space-y-1">
+                                                {item.description.split(/[\r\n]+/).map((line, i) => {
+                                                    const trimmed = line.trim().replace(/^•\s*/, '');
+                                                    return trimmed ? <li key={i}>{trimmed}</li> : null;
+                                                })}
+                                            </ul>
+                                        ) : (
+                                            <p className="whitespace-pre-line">{item.description}</p>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         ))}
                     </div>
@@ -790,9 +1010,26 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                 {profile.skills && (
                     <div className="mb-6">
                         <h2 className="text-sm font-bold uppercase tracking-wider border-b border-black mb-3">Skills</h2>
-                        <p className="text-sm leading-relaxed">
-                            {profile.skills.split(',').map(skill => skill.trim()).join(' • ')}
-                        </p>
+                        {(() => {
+                            const parsed = parseSkills(profile.skills);
+                            if (parsed.type === 'structured') {
+                                return (
+                                    <div className="text-sm leading-relaxed space-y-1">
+                                        {Object.entries(parsed.data).map(([cat, skills]) => (
+                                            <div key={cat}>
+                                                <span className="font-bold">{cat}: </span>
+                                                <span>{skills}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                );
+                            }
+                            return (
+                                <p className="text-sm leading-relaxed">
+                                    {parsed.data.split(',').map(skill => skill.trim()).join(' • ')}
+                                </p>
+                            );
+                        })()}
                     </div>
                 )}
 
@@ -854,7 +1091,20 @@ export const renderTemplate = ({ selectedTemplate, templates, profile, hasWorkEx
                                         <span>{item.title}</span>
                                         {item.subtitle && <span>{item.subtitle}</span>}
                                     </div>
-                                    {item.description && <p className="text-sm mt-1">{item.description}</p>}
+                                    {item.description && (
+                                        <div className="text-sm mt-1">
+                                            {item.description.includes('•') || item.description.includes('\n') ? (
+                                                <ul className="list-disc ml-5 space-y-1">
+                                                    {item.description.split(/[\r\n]+/).map((line, i) => {
+                                                        const trimmed = line.trim().replace(/^•\s*/, '');
+                                                        return trimmed ? <li key={i}>{trimmed}</li> : null;
+                                                    })}
+                                                </ul>
+                                            ) : (
+                                                <p className="whitespace-pre-line">{item.description}</p>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </div>

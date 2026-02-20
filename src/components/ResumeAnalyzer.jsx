@@ -153,6 +153,16 @@ export default function ResumeAnalyzer({ initialAnalysisId }) {
         setExpandedIssues(prev => ({ ...prev, [id]: !prev[id] }));
     };
 
+    const handleBulkFix = () => {
+        if (!analysisData?.critical?.length) return;
+        
+        const instructions = analysisData.critical.map(issue => 
+            `Fix critical issue: ${issue.title} - ${issue.description}. ${issue.fix}`
+        ).join('\n');
+        
+        handleApplyFix('bulk', instructions);
+    };
+
     const handleDownload = async () => {
         if (!fixedData) return;
         setIsDownloading(true);
@@ -305,41 +315,66 @@ export default function ResumeAnalyzer({ initialAnalysisId }) {
                             </div>
 
                             <div className="space-y-4">
-                                {activeTab === 'critical' && analysisData.critical.map((issue, i) => (
-                                    <IssueCard 
-                                        key={i} 
-                                        type="critical" 
-                                        title={issue.title}
-                                        expanded={expandedIssues[`c-${i}`]}
-                                        onToggle={() => toggleIssue(`c-${i}`)}
-                                    >
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                            <div>
-                                                <h4 className="font-bold text-white mb-2">🎯 The Problem</h4>
-                                                <p className="text-neutral-400 text-sm mb-4">{issue.description}</p>
-                                                <h4 className="font-bold text-white mb-2">✅ How to Fix</h4>
-                                                <p className="text-neutral-400 text-sm">{issue.fix}</p>
-                                            </div>
-                                            <div className="bg-neutral-900 p-4 rounded-lg border border-neutral-800">
-                                                <div className="flex justify-between items-center mb-2">
-                                                    <span className="text-xs font-bold text-neutral-500 uppercase">Impact</span>
-                                                    <span className="text-green-500 font-bold">{issue.impact}</span>
-                                                </div>
-                                                <div className="flex justify-between items-center">
-                                                    <span className="text-xs font-bold text-neutral-500 uppercase">Time</span>
-                                                    <span className="text-white font-bold">{issue.time}</span>
-                                                </div>
+                                {activeTab === 'critical' && (
+                                    <>
+                                        {analysisData.critical.length > 0 && (
+                                            <div className="mb-6 flex justify-end">
                                                 <button 
-                                                    onClick={() => handleApplyFix('critical', `Fix this critical issue: ${issue.title} - ${issue.description}. ${issue.fix}`)}
+                                                    onClick={handleBulkFix}
                                                     disabled={fixing !== null}
-                                                    className="w-full mt-4 py-2 bg-white text-black font-bold text-sm rounded hover:bg-neutral-200 transition-colors disabled:opacity-50"
+                                                    className="px-6 py-3 bg-white text-black font-bold rounded-lg hover:bg-neutral-200 transition-colors disabled:opacity-50 shadow-lg shadow-white/10 flex items-center gap-2"
                                                 >
-                                                    {fixing === 'critical' ? 'Applying...' : 'Apply Auto-Fix'}
+                                                    {fixing === 'bulk' ? (
+                                                        <>
+                                                            <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin"></div>
+                                                            <span>Applying All Fixes...</span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <span>⚡</span>
+                                                            <span>Apply Auto-Fix All ({analysisData.critical.length})</span>
+                                                        </>
+                                                    )}
                                                 </button>
                                             </div>
-                                        </div>
-                                    </IssueCard>
-                                ))}
+                                        )}
+                                        {analysisData.critical.map((issue, i) => (
+                                            <IssueCard 
+                                                key={i} 
+                                                type="critical" 
+                                                title={issue.title}
+                                                expanded={expandedIssues[`c-${i}`]}
+                                                onToggle={() => toggleIssue(`c-${i}`)}
+                                            >
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                    <div>
+                                                        <h4 className="font-bold text-white mb-2">🎯 The Problem</h4>
+                                                        <p className="text-neutral-400 text-sm mb-4">{issue.description}</p>
+                                                        <h4 className="font-bold text-white mb-2">✅ How to Fix</h4>
+                                                        <p className="text-neutral-400 text-sm">{issue.fix}</p>
+                                                    </div>
+                                                    <div className="bg-neutral-900 p-4 rounded-lg border border-neutral-800">
+                                                        <div className="flex justify-between items-center mb-2">
+                                                            <span className="text-xs font-bold text-neutral-500 uppercase">Impact</span>
+                                                            <span className="text-green-500 font-bold">{issue.impact}</span>
+                                                        </div>
+                                                        <div className="flex justify-between items-center">
+                                                            <span className="text-xs font-bold text-neutral-500 uppercase">Time</span>
+                                                            <span className="text-white font-bold">{issue.time}</span>
+                                                        </div>
+                                                        <button 
+                                                            onClick={() => handleApplyFix('critical', `Fix this critical issue: ${issue.title} - ${issue.description}. ${issue.fix}`)}
+                                                            disabled={fixing !== null}
+                                                            className="w-full mt-4 py-2 bg-white text-black font-bold text-sm rounded hover:bg-neutral-200 transition-colors disabled:opacity-50"
+                                                        >
+                                                            {fixing === 'critical' ? 'Applying...' : 'Apply Auto-Fix'}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </IssueCard>
+                                        ))}
+                                    </>
+                                )}
 
                                 {activeTab === 'warning' && analysisData.warnings.map((issue, i) => (
                                     <IssueCard 

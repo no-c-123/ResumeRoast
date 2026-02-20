@@ -14,6 +14,7 @@ export default function ResumeTailor() {
     const [jobDescription, setJobDescription] = useState('');
     const [tailoring, setTailoring] = useState(false);
     const [tailoredResume, setTailoredResume] = useState(null);
+    const [targetLanguage, setTargetLanguage] = useState('English');
     
     // Mock extraction data
     const [extractedInfo, setExtractedInfo] = useState(null);
@@ -115,7 +116,8 @@ export default function ResumeTailor() {
                 },
                 body: JSON.stringify({
                     resumeData,
-                    jobDescription
+                    jobDescription,
+                    targetLanguage
                 })
             });
 
@@ -392,6 +394,27 @@ export default function ResumeTailor() {
                             <div className="text-center">
                                 <h2 className="text-3xl font-bold text-white mb-2">How Should We Tailor Your Resume?</h2>
                                 <p className="text-neutral-400">Customize the optimization strategy.</p>
+                            </div>
+
+                            <div className="bg-[#1a1a1a] p-6 rounded-xl border border-neutral-800 hover:border-orange-500/50 transition-colors mb-6">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <h3 className="font-bold text-white">Output Language</h3>
+                                        <p className="text-sm text-neutral-400 mt-1">Select the language for your tailored resume.</p>
+                                    </div>
+                                    <select 
+                                        value={targetLanguage}
+                                        onChange={(e) => setTargetLanguage(e.target.value)}
+                                        className="bg-[#111] border border-neutral-700 rounded-lg px-4 py-2 text-white outline-none focus:border-orange-500"
+                                    >
+                                        <option value="English">English 🇺🇸</option>
+                                        <option value="Spanish">Spanish 🇪🇸</option>
+                                        <option value="French">French 🇫🇷</option>
+                                        <option value="German">German 🇩🇪</option>
+                                        <option value="Italian">Italian 🇮🇹</option>
+                                        <option value="Portuguese">Portuguese 🇵🇹</option>
+                                    </select>
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

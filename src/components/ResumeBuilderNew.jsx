@@ -60,6 +60,7 @@ export default function ResumeBuilderNew({ initialMode = 'editor' }) {
     const [selectedTemplate, setSelectedTemplate] = useState('ivy');
     const [zoom, setZoom] = useState(50);
     const [viewMode, setViewMode] = useState('stepper'); // 'stepper' or 'single'
+    const [targetLanguage, setTargetLanguage] = useState('English');
 
     const steps = [
         { id: 1, title: 'Personal', icon: '👤' },
@@ -315,7 +316,8 @@ export default function ResumeBuilderNew({ initialMode = 'editor' }) {
                 body: JSON.stringify({
                     userId: user.id,
                     resumeData,
-                    customInstructions: finalInstructions
+                    customInstructions: finalInstructions,
+                    targetLanguage
                 })
             });
 
@@ -420,6 +422,21 @@ export default function ResumeBuilderNew({ initialMode = 'editor' }) {
                     ) : lastSaved && (
                         <span className="text-xs text-neutral-500 hidden md:inline">Saved {lastSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                     )}
+                    
+                    <select
+                        value={targetLanguage}
+                        onChange={(e) => setTargetLanguage(e.target.value)}
+                        className="hidden md:block bg-neutral-800 text-neutral-400 hover:text-white text-xs font-bold border border-neutral-800 rounded-lg px-2 py-2 outline-none cursor-pointer transition-colors"
+                        title="AI Output Language"
+                    >
+                        <option value="English">English 🇺🇸</option>
+                        <option value="Spanish">Spanish 🇪🇸</option>
+                        <option value="French">French 🇫🇷</option>
+                        <option value="German">German 🇩🇪</option>
+                        <option value="Italian">Italian 🇮🇹</option>
+                        <option value="Portuguese">Portuguese 🇵🇹</option>
+                    </select>
+
                     <button
                         onClick={() => setViewMode(m => m === 'stepper' ? 'single' : 'stepper')}
                         className="hidden md:block px-3 py-2 text-xs font-bold text-neutral-400 hover:text-white border border-neutral-800 rounded-lg hover:bg-neutral-800 transition-colors"

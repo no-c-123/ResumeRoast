@@ -28,6 +28,7 @@ export const ImproveSchema = z.object({
   }).optional().nullable(),
   analysisId: z.string().uuid().optional().nullable(),
   customInstructions: z.string().optional().nullable(),
+  targetLanguage: z.string().optional().default('English'),
 });
 
 export const MetadataSchema = z.object({
@@ -54,4 +55,5 @@ export const TailorSchema = z.object({
   }).optional(),
   jobDescription: z.string().min(10),
   originalSuggestions: z.any().optional(),
+  targetLanguage: z.string().optional().default('English'),
 });

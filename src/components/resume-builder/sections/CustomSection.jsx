@@ -1,7 +1,7 @@
 import React from 'react';
 import { SectionHeader } from '../ui/SectionHeader';
 import { InputField } from '../ui/InputField';
-import { TextArea } from '../ui/TextArea';
+import { RichTextEditor } from '../ui/RichTextEditor';
 import { SortableItem } from '../ui/SortableItem';
 
 import {
@@ -139,7 +139,7 @@ export const CustomSection = ({
                                             placeholder="e.g. 2023"
                                         />
 
-                                        <TextArea
+                                        <RichTextEditor
                                             label="Description (Optional)"
                                             value={item.description}
                                             onChange={(e) => updateItem(item.id, 'description', e.target.value)}

@@ -44,7 +44,7 @@ export async function POST({ request }) {
       return new Response(JSON.stringify({ error: 'Invalid input', details: result.error.format() }), { status: 400 });
     }
 
-    const { userId, resumeText, resumeData, analysisId, customInstructions } = result.data;
+    const { userId, resumeText, resumeData, analysisId, customInstructions, targetLanguage } = result.data;
 
     const isAllowedRate = await checkRateLimit(userId, 'improve-resume');
     if (!isAllowedRate) {
@@ -174,6 +174,7 @@ Current Resume Data:
 ${JSON.stringify(finalResumeData, null, 2)}
 
 INSTRUCTIONS:
+0. **LANGUAGE**: Output the entire resume in ${targetLanguage || 'English'}. Translate any content if necessary to match this target language.
 1. **Professional Summary**: Rewrite to be concise, impactful, and ATS-friendly. Use strong action verbs and quantify when possible.
 2. **Work Experience**: 
    - Rewrite each job description to start with strong action verbs

@@ -1,6 +1,7 @@
 import React from 'react';
 import { SectionHeader } from '../ui/SectionHeader';
 import { TextArea } from '../ui/TextArea';
+import { SkillsEditor } from '../ui/SkillsEditor';
 
 export const ProfessionalSection = ({ 
     profile, 
@@ -75,48 +76,20 @@ export const ProfessionalSection = ({
                         }`}
                 >
                     <div className="bg-[#151515] border-t border-neutral-800 p-6">
-                        <TextArea
-                            label="Skills (Comma Separated)"
-                            value={profile.skills}
-                            onChange={e => handleProfileChange('skills', e.target.value)}
-                            placeholder="React, Node.js, Project Management, Communication..."
-                            aiAssist={false}
-                        />
-                        <div className="mt-4 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                            <div className="flex justify-between items-center mb-2">
-                                <h4 className="text-blue-400 text-sm font-bold flex items-center gap-2">
-                                    💡 Suggested Skills {isSuggestingSkills && <span className="animate-spin">⌛</span>}
-                                </h4>
-                                <button
-                                    onClick={() => fetchSuggestedSkills(profile.professional_summary)}
-                                    className="text-xs text-blue-400 hover:text-white underline"
-                                >
-                                    Refresh
-                                </button>
-                            </div>
-
-                            <div className="flex flex-wrap gap-2">
-                                {suggestedSkills.length === 0 && !isSuggestingSkills && (
-                                    <p className="text-neutral-500 text-xs italic">
-                                        Type more in your summary to get AI recommendations...
-                                    </p>
-                                )}
-                                {suggestedSkills.map(s => (
-                                    <button
-                                        key={s}
-                                        className="px-2 py-1 bg-blue-500/20 text-blue-300 text-xs rounded hover:bg-blue-500/30 transition-colors"
-                                        onClick={() => {
-                                            const current = profile.skills || '';
-                                            const separator = current.trim().endsWith(',') || current === '' ? '' : ', ';
-                                            handleProfileChange('skills', current + separator + s);
-                                            // Ideally we should remove from suggested skills in the parent or handle it here if we had state
-                                        }}
-                                    >
-                                        + {s}
-                                    </button>
-                                ))}
-                            </div>
+                        <div className="flex justify-end mb-4">
+                            <button
+                                onClick={() => fetchSuggestedSkills(profile.professional_summary)}
+                                className="text-xs text-blue-400 hover:text-white underline flex items-center gap-1"
+                            >
+                                {isSuggestingSkills ? <span className="animate-spin">⌛</span> : '💡'} Refresh Suggestions
+                            </button>
                         </div>
+                        
+                        <SkillsEditor
+                            value={profile.skills}
+                            onChange={(val) => handleProfileChange('skills', val)}
+                            suggestedSkills={suggestedSkills}
+                        />
                     </div>
                 </div>
             </div>

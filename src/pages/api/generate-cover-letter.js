@@ -19,7 +19,8 @@ const RequestSchema = z.object({
         education: z.any(),
         projects: z.any(),
     }),
-    jobDescription: z.string().optional()
+    jobDescription: z.string().optional(),
+    targetLanguage: z.string().optional().default('English')
 });
 
 export async function POST({ request }) {
@@ -93,7 +94,7 @@ export async function POST({ request }) {
       return new Response(JSON.stringify({ error: 'Invalid input' }), { status: 400 });
     }
 
-    const { resumeData, jobDescription } = result.data;
+    const { resumeData, jobDescription, targetLanguage } = result.data;
 
     const message = await anthropic.messages.create({
       model: "claude-sonnet-4-20250514",
@@ -110,6 +111,7 @@ Candidate's Resume Data:
 ${JSON.stringify(resumeData, null, 2)}
 
 INSTRUCTIONS:
+0. **LANGUAGE**: Write the cover letter in ${targetLanguage || 'English'}.
 1. **Tone**: Professional, confident, and enthusiastic.
 2. **Structure**:
    - **Header**: Standard business letter format (if possible in text, otherwise just start with salutation).

@@ -17,6 +17,7 @@ export default function CoverLetterGenerator() {
     const [length, setLength] = useState('concise');
     const [selectedAchievements, setSelectedAchievements] = useState([]);
     const [achievementsList, setAchievementsList] = useState([]);
+    const [targetLanguage, setTargetLanguage] = useState('English');
     
     const [resumes, setResumes] = useState([]);
     const [selectedResumeId, setSelectedResumeId] = useState(null);
@@ -105,7 +106,8 @@ export default function CoverLetterGenerator() {
                     jobDescription,
                     tone,
                     length,
-                    focusedAchievements: selectedAchievements
+                    focusedAchievements: selectedAchievements,
+                    targetLanguage
                 })
             });
 
@@ -270,6 +272,23 @@ export default function CoverLetterGenerator() {
                                         className="border-t border-neutral-800"
                                     >
                                         <div className="p-5 space-y-6">
+                                            {/* Language Selector */}
+                                            <div>
+                                                <label className="text-xs font-bold text-neutral-400 uppercase mb-3 block">Language</label>
+                                                <select 
+                                                    value={targetLanguage}
+                                                    onChange={(e) => setTargetLanguage(e.target.value)}
+                                                    className="w-full bg-[#111] border border-neutral-700 rounded-lg px-4 py-2 text-white outline-none focus:border-orange-500"
+                                                >
+                                                    <option value="English">English 🇺🇸</option>
+                                                    <option value="Spanish">Spanish 🇪🇸</option>
+                                                    <option value="French">French 🇫🇷</option>
+                                                    <option value="German">German 🇩🇪</option>
+                                                    <option value="Italian">Italian 🇮🇹</option>
+                                                    <option value="Portuguese">Portuguese 🇵🇹</option>
+                                                </select>
+                                            </div>
+
                                             {/* Tone Selector */}
                                             <div>
                                                 <label className="text-xs font-bold text-neutral-400 uppercase mb-3 block">Tone</label>

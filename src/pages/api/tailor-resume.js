@@ -49,7 +49,7 @@ export async function POST({ request }) {
             });
         }
 
-        const { resumeText, jobDescription, resumeData: providedResumeData } = validation.data;
+        const { resumeText, jobDescription, resumeData: providedResumeData, targetLanguage } = validation.data;
 
         const authHeader = request.headers.get('Authorization');
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -197,6 +197,7 @@ CURRENT RESUME DATA:
 ${JSON.stringify(resumeData, null, 2)}
 
 TASK: Tailor this resume specifically for the job description above. Rewrite sections to:
+0. **LANGUAGE**: Output the entire resume in ${targetLanguage || 'English'}. Translate any content if necessary to match this target language.
 1. Include job-specific keywords naturally throughout
 2. Emphasize relevant experience and skills that match the job requirements
 3. Reframe achievements to align with what the job is looking for
