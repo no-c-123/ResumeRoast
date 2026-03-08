@@ -522,7 +522,7 @@ function AccountDashboard() {
                                 >
                                     Upgrade to Pro
                                 </a>
-                            ) : (
+                            ) : subscription.stripe_customer_id ? (
                                 <button
                                     onClick={handleManageSubscription}
                                     className="w-full py-2.5 bg-neutral-800 hover:bg-neutral-700 border border-white/10 rounded-lg text-sm font-medium transition-all text-white flex items-center justify-center gap-2"
@@ -532,6 +532,10 @@ function AccountDashboard() {
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
                                     </svg>
                                 </button>
+                            ) : (
+                                <div className="w-full py-2.5 bg-neutral-800/50 border border-white/5 rounded-lg text-sm font-medium text-neutral-400 text-center cursor-default">
+                                    Active Plan
+                                </div>
                             )}
 
                             <div className="pt-3 border-t border-white/10">
