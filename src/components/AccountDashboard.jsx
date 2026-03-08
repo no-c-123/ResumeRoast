@@ -75,6 +75,32 @@ function AccountDashboard() {
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     ];
 
+    const handleManageSubscription = async () => {
+        try {
+            const session = await authService.getSession();
+            if (!session) return;
+
+            const response = await fetch('/api/create-portal-session', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`
+                }
+            });
+            
+            const data = await response.json();
+            if (data.url) {
+                window.location.href = data.url;
+            } else {
+                console.error('Portal session creation failed:', data.error);
+                alert('Could not access billing portal. Please try again later.');
+            }
+        } catch (error) {
+            console.error('Error opening billing portal:', error);
+            alert('An error occurred. Please try again.');
+        }
+    };
+
     const handleLogout = async () => {
         try {
             await signOut();
@@ -496,7 +522,17 @@ function AccountDashboard() {
                                 >
                                     Upgrade to Pro
                                 </a>
-                            ) : null}
+                            ) : (
+                                <button
+                                    onClick={handleManageSubscription}
+                                    className="w-full py-2.5 bg-neutral-800 hover:bg-neutral-700 border border-white/10 rounded-lg text-sm font-medium transition-all text-white flex items-center justify-center gap-2"
+                                >
+                                    Manage Subscription
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                                    </svg>
+                                </button>
+                            )}
 
                             <div className="pt-3 border-t border-white/10">
                                 <p className="text-xs text-neutral-400 mb-2">Recent Activity</p>

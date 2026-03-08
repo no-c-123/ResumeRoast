@@ -56,7 +56,7 @@ export const ProjectsSection = ({
                 onToggle={() => toggleSection('projects')}
             />
             <div
-                className={`transition-all duration-300 ease-in-out overflow-hidden ${expandedSections['projects'] ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'
+                className={`transition-all duration-300 ease-in-out overflow-hidden ${expandedSections['projects'] ? 'max-h-[10000px] opacity-100' : 'max-h-0 opacity-0'
                     }`}
             >
                 <div className="bg-[#151515] border-t border-neutral-800 p-6 space-y-6">
@@ -71,7 +71,7 @@ export const ProjectsSection = ({
                         >
                             {projects.map((proj, i) => (
                                 <SortableItem key={proj.id} id={proj.id}>
-                                    <div className="bg-neutral-900 p-4 rounded-lg border border-neutral-800 space-y-4 h-[600px]">
+                                    <div className="bg-neutral-900 p-4 rounded-lg border border-neutral-800 space-y-4 h-auto min-h-[400px]">
                                         <div className="flex justify-between items-start">
                                             <h4 className="font-bold text-white text-sm">Project {i + 1}</h4>
                                             <button

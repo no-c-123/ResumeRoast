@@ -52,7 +52,7 @@ export default function ResumeBuilderNew({ initialMode = 'editor' }) {
 
     const [improvingSection, setImprovingSection] = useState(null);
     const [aiImprovements, setAiImprovements] = useState({});
-    const [suggestedSkills, setSuggestedSkills] = useState([]);
+    const [suggestedSkills, setSuggestedSkills] = useState({});
     const [isSuggestingSkills, setIsSuggestingSkills] = useState(false);
     const [isDownloading, setIsDownloading] = useState(false);
 
@@ -273,8 +273,12 @@ export default function ResumeBuilderNew({ initialMode = 'editor' }) {
             });
 
             const data = await response.json();
-            if (data.success && Array.isArray(data.skills)) {
-                setSuggestedSkills(data.skills);
+            if (data.success) {
+                if (Array.isArray(data.skills)) {
+                    setSuggestedSkills({ "Core Skills": data.skills });
+                } else if (typeof data.skills === 'object') {
+                    setSuggestedSkills(data.skills);
+                }
             }
         } catch (error) {
             console.error('Error fetching skills:', error);

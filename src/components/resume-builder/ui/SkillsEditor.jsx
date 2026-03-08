@@ -48,11 +48,101 @@ const CATEGORY_TRANSLATIONS = {
 const DEFAULT_CATEGORIES = ['Hard Skills', 'Soft Skills', 'Languages'];
 const ALL_CATEGORIES = ['Hard Skills', 'Soft Skills', 'Languages', 'Tools', 'Core Skills'];
 
-export const SkillsEditor = ({ value, onChange, suggestedSkills = [] }) => {
+export const SkillsEditor = ({ value, onChange, suggestedSkills = {} }) => {
     const [mode, setMode] = useState('categorized'); // 'categorized' | 'single'
     const [language, setLanguage] = useState('English');
     const [categories, setCategories] = useState({});
     const [newItem, setNewItem] = useState({});
+    const [newCategoryName, setNewCategoryName] = useState('');
+    const [editingCategory, setEditingCategory] = useState(null);
+    const [tempCategoryName, setTempCategoryName] = useState('');
+
+    // Helper to get suggestions for a category
+    const getSuggestionsFor = (cat) => {
+        if (!suggestedSkills || Array.isArray(suggestedSkills)) return [];
+        
+        // 1. Direct match
+        if (suggestedSkills[cat]) return suggestedSkills[cat];
+        
+        // 2. Translation match
+        const currentLangTrans = CATEGORY_TRANSLATIONS[language];
+        const engKey = Object.keys(currentLangTrans).find(key => currentLangTrans[key] === cat);
+        if (engKey && suggestedSkills[engKey]) return suggestedSkills[engKey];
+        
+        return [];
+    };
+
+    const getUnusedSuggestions = () => {
+        if (!suggestedSkills || Array.isArray(suggestedSkills)) return [];
+        
+        const usedCategories = Object.keys(categories);
+        const usedSkills = new Set();
+        
+        // Mark all suggestions that belong to currently displayed categories as "used"
+        usedCategories.forEach(cat => {
+            const suggestions = getSuggestionsFor(cat);
+            suggestions.forEach(s => usedSkills.add(s));
+        });
+        
+        // Collect all other suggestions
+        const unused = [];
+        Object.entries(suggestedSkills).forEach(([cat, skills]) => {
+             if (Array.isArray(skills)) {
+                 skills.forEach(s => {
+                     // Only add if not already displayed inline AND not already in user's list
+                     if (!usedSkills.has(s) && !Object.values(categories).some(list => list.includes(s))) {
+                         unused.push({ skill: s, category: cat });
+                     }
+                 });
+             }
+        });
+        
+        return unused;
+    };
+
+    const addCustomCategory = () => {
+        if (!newCategoryName.trim()) return;
+        if (categories[newCategoryName]) return;
+        
+        const newCategories = {
+            ...categories,
+            [newCategoryName]: []
+        };
+        setCategories(newCategories);
+        updateParent(newCategories);
+        setNewCategoryName('');
+    };
+
+    const startEditingCategory = (cat) => {
+        setEditingCategory(cat);
+        setTempCategoryName(cat);
+    };
+
+    const saveCategoryName = (oldName) => {
+        const trimmedName = tempCategoryName.trim();
+        if (!trimmedName || trimmedName === oldName) {
+            setEditingCategory(null);
+            return;
+        }
+        
+        if (categories[trimmedName]) {
+            setEditingCategory(null);
+            return;
+        }
+        
+        const newCategories = {};
+        Object.keys(categories).forEach(key => {
+            if (key === oldName) {
+                newCategories[trimmedName] = categories[oldName];
+            } else {
+                newCategories[key] = categories[key];
+            }
+        });
+        
+        setCategories(newCategories);
+        updateParent(newCategories);
+        setEditingCategory(null);
+    };
 
     // Parse the initial string value
     useEffect(() => {
@@ -257,7 +347,7 @@ export const SkillsEditor = ({ value, onChange, suggestedSkills = [] }) => {
                 {mode === 'categorized' && (
                     <>
                         <div className="h-6 w-px bg-neutral-800"></div>
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap gap-2 items-center">
                             {ALL_CATEGORIES.map(catKey => {
                                 const label = CATEGORY_TRANSLATIONS[language][catKey];
                                 const isActive = !!categories[label];
@@ -275,6 +365,25 @@ export const SkillsEditor = ({ value, onChange, suggestedSkills = [] }) => {
                                     </button>
                                 );
                             })}
+                            
+                            {/* Add Custom Category Input */}
+                            <div className="flex items-center gap-1 ml-2">
+                                <input
+                                    type="text"
+                                    value={newCategoryName}
+                                    onChange={(e) => setNewCategoryName(e.target.value)}
+                                    placeholder="New Category..."
+                                    className="bg-neutral-800 text-[10px] text-white px-2 py-1 rounded border border-neutral-700 w-24 focus:outline-none focus:border-neutral-500"
+                                    onKeyDown={(e) => e.key === 'Enter' && addCustomCategory()}
+                                />
+                                <button
+                                    onClick={addCustomCategory}
+                                    disabled={!newCategoryName.trim()}
+                                    className="px-2 py-1 bg-neutral-800 text-neutral-400 text-[10px] font-bold rounded border border-neutral-700 hover:text-white hover:border-neutral-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    +
+                                </button>
+                            </div>
                         </div>
                     </>
                 )}
@@ -282,87 +391,161 @@ export const SkillsEditor = ({ value, onChange, suggestedSkills = [] }) => {
 
             {/* Editors */}
             <div className="space-y-6">
-                {Object.keys(categories).map(category => (
-                    <div key={category} className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
-                        <label className="text-xs font-bold text-neutral-400 uppercase tracking-wider flex justify-between items-center">
-                            {category}
-                            {mode === 'categorized' && (
-                                <button 
-                                    onClick={() => {
-                                        const newCats = { ...categories };
-                                        delete newCats[category];
-                                        setCategories(newCats);
-                                        updateParent(newCats);
-                                    }}
-                                    className="text-neutral-600 hover:text-red-500 px-2"
-                                >
-                                    Remove
-                                </button>
-                            )}
-                        </label>
-                        
-                        <div className="flex flex-wrap gap-2 mb-2 min-h-[32px]">
-                            {categories[category].map((skill, index) => (
-                                <span key={index} className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-neutral-800 text-white border border-neutral-700">
-                                    {skill}
-                                    <button
-                                        onClick={() => removeItem(category, index)}
-                                        className="ml-2 text-neutral-500 hover:text-red-500 focus:outline-none"
-                                    >
-                                        ×
-                                    </button>
-                                </span>
-                            ))}
-                        </div>
+                {Object.keys(categories).map(category => {
+                    const suggestions = getSuggestionsFor(category);
+                    const availableSuggestions = suggestions.filter(s => !categories[category].includes(s));
 
-                        <div className="flex gap-2">
-                            <input
-                                type="text"
-                                value={newItem[category] || ''}
-                                onChange={(e) => setNewItem(prev => ({ ...prev, [category]: e.target.value }))}
-                                onKeyDown={(e) => handleKeyDown(e, category)}
-                                placeholder={`Add to ${category}...`}
-                                className="flex-1 bg-neutral-900 border border-neutral-800 rounded-lg px-4 py-2 text-sm text-white focus:border-blue-500 focus:outline-none transition-colors"
-                            />
-                            <button
-                                onClick={() => addItem(category)}
-                                className="px-4 py-2 bg-neutral-800 text-white text-sm font-bold rounded-lg hover:bg-neutral-700 transition-colors"
-                            >
-                                Add
-                            </button>
+                    return (
+                        <div key={category} className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                            <div className="flex justify-between items-center text-xs font-bold text-neutral-400 uppercase tracking-wider">
+                                {editingCategory === category ? (
+                                    <div className="flex items-center gap-2">
+                                        <input 
+                                            type="text"
+                                            value={tempCategoryName}
+                                            onChange={(e) => setTempCategoryName(e.target.value)}
+                                            className="bg-neutral-800 text-white px-2 py-1 rounded border border-neutral-600 focus:outline-none focus:border-blue-500"
+                                            autoFocus
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') saveCategoryName(category);
+                                                if (e.key === 'Escape') setEditingCategory(null);
+                                            }}
+                                            onBlur={() => saveCategoryName(category)}
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center gap-2 group">
+                                        <span>{category}</span>
+                                        {mode === 'categorized' && (
+                                            <button 
+                                                onClick={() => startEditingCategory(category)}
+                                                className="opacity-0 group-hover:opacity-100 text-neutral-600 hover:text-white transition-opacity"
+                                                title="Rename Category"
+                                            >
+                                                ✏️
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+
+                                {mode === 'categorized' && (
+                                    <button 
+                                        onClick={() => {
+                                            const newCats = { ...categories };
+                                            delete newCats[category];
+                                            setCategories(newCats);
+                                            updateParent(newCats);
+                                        }}
+                                        className="text-neutral-600 hover:text-red-500 px-2"
+                                    >
+                                        Remove
+                                    </button>
+                                )}
+                            </div>
+                            
+                            {/* Inline Suggestions */}
+                            {availableSuggestions.length > 0 && (
+                                <div className="flex flex-wrap gap-2 mb-2 items-center">
+                                    <span className="text-[10px] text-blue-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                                        💡 Suggested:
+                                    </span>
+                                    {availableSuggestions.map(s => (
+                                        <button
+                                            key={s}
+                                            onClick={() => {
+                                                const newCategories = {
+                                                    ...categories,
+                                                    [category]: [...(categories[category] || []), s]
+                                                };
+                                                setCategories(newCategories);
+                                                updateParent(newCategories);
+                                            }}
+                                            className="px-2 py-0.5 bg-blue-500/10 text-blue-300 text-[10px] rounded border border-blue-500/20 hover:bg-blue-500/20 transition-colors"
+                                        >
+                                            + {s}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+
+                            <div className="flex flex-wrap gap-2 mb-2 min-h-[32px]">
+                                {categories[category].map((skill, index) => (
+                                    <span key={index} className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-neutral-800 text-white border border-neutral-700">
+                                        {skill}
+                                        <button
+                                            onClick={() => removeItem(category, index)}
+                                            className="ml-2 text-neutral-500 hover:text-red-500 focus:outline-none"
+                                        >
+                                            ×
+                                        </button>
+                                    </span>
+                                ))}
+                            </div>
+
+                            <div className="flex gap-2">
+                                <input
+                                    type="text"
+                                    value={newItem[category] || ''}
+                                    onChange={(e) => setNewItem(prev => ({ ...prev, [category]: e.target.value }))}
+                                    onKeyDown={(e) => handleKeyDown(e, category)}
+                                    placeholder={`Add to ${category}...`}
+                                    className="flex-1 bg-neutral-900 border border-neutral-800 rounded-lg px-4 py-2 text-sm text-white focus:border-blue-500 focus:outline-none transition-colors"
+                                />
+                                <button
+                                    onClick={() => addItem(category)}
+                                    className="px-4 py-2 bg-neutral-800 text-white text-sm font-bold rounded-lg hover:bg-neutral-700 transition-colors"
+                                >
+                                    Add
+                                </button>
+                            </div>
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
 
-            {/* Suggestions */}
-            {suggestedSkills.length > 0 && (
+            {/* More Suggestions (Unused) */}
+            {getUnusedSuggestions().length > 0 && (
                 <div className="mt-4 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
                     <h4 className="text-blue-400 text-sm font-bold mb-2 flex items-center gap-2">
-                        💡 AI Suggestions
+                        💡 More Suggestions
                     </h4>
                     <div className="flex flex-wrap gap-2">
-                        {suggestedSkills.filter(s => {
-                            // Filter out if present in any category
-                            return !Object.values(categories).some(list => list.includes(s));
-                        }).map(s => (
+                        {getUnusedSuggestions().map(({ skill, category }) => (
                             <button
-                                key={s}
-                                className="px-2 py-1 bg-blue-500/20 text-blue-300 text-xs rounded hover:bg-blue-500/30 transition-colors"
+                                key={`${category}-${skill}`}
+                                className="px-2 py-1 bg-blue-500/20 text-blue-300 text-xs rounded hover:bg-blue-500/30 transition-colors flex items-center gap-1"
                                 onClick={() => {
-                                    // Add to first available category or Hard Skills/Core Skills
-                                    const firstCat = Object.keys(categories)[0];
-                                    if (firstCat) {
-                                        const newCategories = {
-                                            ...categories,
-                                            [firstCat]: [...(categories[firstCat] || []), s]
-                                        };
-                                        setCategories(newCategories);
-                                        updateParent(newCategories);
+                                    const trans = CATEGORY_TRANSLATIONS[language];
+                                    // Try to find if this category name maps to a known key in current language
+                                    // The 'category' from suggestions is likely English (e.g. "Hard Skills")
+                                    // trans key is English (e.g. "Hard Skills"), value is Localized (e.g. "Habilidades Duras")
+                                    
+                                    let catLabel = category;
+                                    
+                                    // Check if 'category' matches a known key in English translations map
+                                    // CATEGORY_TRANSLATIONS['English'] has keys same as values usually.
+                                    // But we should check if 'category' is a key in CATEGORY_TRANSLATIONS[language]
+                                    
+                                    if (trans[category]) {
+                                        catLabel = trans[category];
                                     }
+                                    
+                                    // Or if it's already localized? 
+                                    // We assume suggestions are English keys mostly.
+                                    
+                                    const newCategories = { ...categories };
+                                    if (!newCategories[catLabel]) {
+                                        newCategories[catLabel] = [];
+                                    }
+                                    newCategories[catLabel] = [...newCategories[catLabel], skill];
+                                    
+                                    setCategories(newCategories);
+                                    updateParent(newCategories);
                                 }}
+                                title={`Add to ${category}`}
                             >
-                                + {s}
+                                <span className="opacity-50 text-[10px] uppercase mr-1">{category}:</span>
+                                + {skill}
                             </button>
                         ))}
                     </div>
