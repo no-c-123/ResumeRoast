@@ -4,9 +4,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 export default function LaunchOfferModal() {
     const [isOpen, setIsOpen] = useState(false);
     
-    // Set launch date to 15 days from Feb 20, 2026 (Launch Day)
+    // Set launch date to 30 days from Feb 20, 2026 (Launch Day)
     // You can adjust this date to your actual launch date
-    const TARGET_DATE = new Date('2026-03-07T00:00:00'); 
+    const TARGET_DATE = new Date('2026-03-22T00:00:00'); 
 
     const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
 
@@ -111,7 +111,7 @@ export default function LaunchOfferModal() {
 
                             <div className="space-y-6 text-zinc-300 mb-8 leading-relaxed text-left bg-zinc-800/30 p-6 rounded-2xl border border-white/5">
                                 <p>
-                                    For the next <strong className="text-white">15 days</strong>, sign up and get 1 full month of ResumeRoast completely free.
+                                    For the next <strong className="text-white">30 days</strong>, sign up and get 1 full month of ResumeRoast completely free.
                                 </p>
                                 <ul className="space-y-2">
                                     <li className="flex items-center gap-3 text-sm">
@@ -128,7 +128,7 @@ export default function LaunchOfferModal() {
                                     </li>
                                 </ul>
                                 <p className="text-xs text-zinc-500 italic border-t border-white/5 pt-4 flex justify-between items-center">
-                                    <span>Offer ends March 7, 2026</span>
+                                    <span>Offer ends March 22, 2026</span>
                                     <span className="text-orange-500/80">Don't miss out</span>
                                 </p>
                             </div>
