@@ -396,7 +396,7 @@ export default function CoverLetterGenerator() {
                                 <div className="w-64 h-64 mb-6 relative">
                                     {/* Abstract visual placeholder */}
                                     <div className="absolute inset-0 bg-gradient-to-tr from-orange-500/10 to-blue-500/10 rounded-full blur-3xl"></div>
-                                    <img src="/logo-orange.png" alt="ResumeRoast" className="w-32 h-32 mx-auto relative z-10 opacity-50 grayscale hover:grayscale-0 transition-all duration-700" />
+                                    <img src="/favicon.png" alt="ResumeRoast" className="w-32 h-32 mx-auto relative z-10 opacity-50 grayscale hover:grayscale-0 transition-all duration-700" />
                                 </div>
                                 <h2 className="text-2xl font-bold text-white mb-2">Your perfect introduction is one click away</h2>
                                 <p className="text-neutral-400 max-w-md mb-8">
