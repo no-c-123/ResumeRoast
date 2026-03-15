@@ -224,8 +224,8 @@ function LoginForm() {
 
     return (
 
-        <div className='min-h-screen flex items-center justify-center p-4'>
-            <div className={`relative w-full max-w-6xl rounded-3xl shadow-2xl overflow-hidden transition-all duration-300 ${isSignUp ? 'md:h-[800px]' : 'h-[500px] md:h-[600px]'}`}>
+        <div className='min-h-screen flex p-4'>
+            <div className={`m-auto relative w-full max-w-6xl rounded-3xl shadow-2xl overflow-hidden transition-all duration-300 ${isSignUp ? 'h-[1100px] md:h-[800px]' : 'h-[700px] md:h-[600px]'}`}>
                 
                 {/* Sliding Overlay */}
                 <div
@@ -268,7 +268,7 @@ function LoginForm() {
                 {/* Login Form */}
 
                 <div className="flex justify-center items-center w-full h-full bg-black rounded-3xl">
-                    <div className="flex justify-center items-center w-full h-full [background:linear-gradient(#000,#000)_padding-box,conic-gradient(from_var(--border-angle),theme(colors.orange.600)_80%,_theme(colors.orange.500)_86%,_theme(colors.orange.300)_90%,_theme(colors.orange.500)_94%,_theme(colors.orange.600))_border-box] rounded-3xl border-[3px] border-transparent [animation:border_4s_linear_infinite]">
+                    <div className="flex flex-col md:flex-row justify-center items-center w-full h-full [background:linear-gradient(#000,#000)_padding-box,conic-gradient(from_var(--border-angle),theme(colors.orange.600)_80%,_theme(colors.orange.500)_86%,_theme(colors.orange.300)_90%,_theme(colors.orange.500)_94%,_theme(colors.orange.600))_border-box] rounded-3xl border-[3px] border-transparent [animation:border_4s_linear_infinite]">
                         
                         {/* ========== LOGIN SECTION ========== */}
                         <div className={`flex justify-center items-center w-full md:w-1/2 h-1/2 md:h-full transition-opacity duration-700 ${isSignUp ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
@@ -546,7 +546,7 @@ function LoginForm() {
                                     <button 
                                         type="submit" 
                                         disabled={isLoading}
-                                        className="w-full max-w-sm h-11 bg-gradient-to-r from-[#FF6333FF] to-[#DC2626FF] rounded-lg text-white font-semibold hover:opacity-90 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:ring-offset-black disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                        className="w-full max-w-sm h-11 bg-gradient-to-r from-[#FF6333FF] to-[#DC2626FF] rounded-lg text-white font-semibold hover:opacity-90 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:ring-offset-black disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-2"
                                     >
                                         {isLoading ? (
                                             <>
@@ -558,6 +558,14 @@ function LoginForm() {
                                             </>
                                         ) : 'Create Account'}
                                     </button>
+                                    
+                                    <p className="text-xs text-neutral-400 text-center max-w-sm mt-2">
+                                        By signing up, you agree to our{' '}
+                                        <a href="/terms" className="text-orange-500 hover:text-orange-400 underline transition-colors" target="_blank" rel="noopener noreferrer">Terms of Service</a>,{' '}
+                                        <a href="/privacy" className="text-orange-500 hover:text-orange-400 underline transition-colors" target="_blank" rel="noopener noreferrer">Privacy Policy</a>, and{' '}
+                                        <a href="/cookies" className="text-orange-500 hover:text-orange-400 underline transition-colors" target="_blank" rel="noopener noreferrer">Cookie Policy</a>.
+                                    </p>
+
                                     {successMessage && <p className="text-green-500 text-sm mt-2">{successMessage}</p>}
                                 </form>
                             </section>        

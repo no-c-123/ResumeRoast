@@ -1,21 +1,17 @@
 ---
-import { getCollection } from 'astro:content';
-import type { CollectionEntry } from 'astro:content';
+import { getCollection, getEntry } from 'astro:content';
 import Layout from '../../layouts/Layout.astro';
 
-export async function getStaticPaths() {
-  const examples = await getCollection('examples');
-  return examples.map((ex: CollectionEntry<'examples'>) => ({
-    params: { slug: ex.slug },
-    props: { ex },
-  }));
+const { slug } = Astro.params;
+if (!slug) {
+  return Astro.redirect('/examples');
 }
 
-type Props = {
-  ex: CollectionEntry<'examples'>;
-};
+const ex = await getEntry('examples', slug);
+if (!ex) {
+  return Astro.redirect('/404');
+}
 
-const { ex } = Astro.props;
 const { Content } = await ex.render();
 ---
 
@@ -52,7 +48,21 @@ const { Content } = await ex.render();
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <!-- Resume Preview -->
         <div class="lg:col-span-2 bg-white text-black rounded-lg shadow-2xl p-8 min-h-[800px]">
-           <Content />
+           {ex.data.pdf ? (
+             <div class="w-full h-full min-h-[800px]">
+               <object
+                 data={ex.data.pdf}
+                 type="application/pdf"
+                 width="100%"
+                 height="100%"
+                 class="w-full h-full min-h-[800px]"
+               >
+                 <p>Your browser does not support PDFs. <a href={ex.data.pdf}>Download the PDF</a>.</p>
+               </object>
+             </div>
+           ) : (
+             <Content />
+           )}
         </div>
 
         <!-- Sidebar Analysis -->

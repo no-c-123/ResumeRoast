@@ -4,6 +4,7 @@ import { ViewTransitions } from 'astro:transitions';
 import ToastContainer from '../components/uicomponents/ToastContainer.jsx';
 import { AuthProvider } from '../contexts/AuthContext';
 import ErrorBoundary from '../components/ErrorBoundary';
+import CookieConsent from '../components/CookieConsent.jsx';
 
 const { title = "Resume Roast" } = Astro.props;
 ---
@@ -23,6 +24,7 @@ const { title = "Resume Roast" } = Astro.props;
                 <ToastContainer client:load transition:persist />
                 <ViewTransitions />
                 <slot/>
+                <CookieConsent client:load />
             </AuthProvider>
         </ErrorBoundary>
 	</body>

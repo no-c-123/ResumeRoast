@@ -1,0 +1,444 @@
+%PDF-1.3
+%ºß¬à
+3 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/MediaBox [0 0 595.2799999999999727 841.8899999999999864]
+/Contents 4 0 R
+>>
+endobj
+4 0 obj
+<<
+/Length 5352
+>>
+stream
+0.5670000000000001 w
+0 G
+BT
+/F10 24 Tf
+27.5999999999999979 TL
+0. g
+236.9199999999999875 785.1970866141732586 Td
+(Hector Leal) Tj
+ET
+BT
+/F9 10 Tf
+11.5 TL
+0. g
+157.239999999999867 748.9136220472440755 Td
+(Monterrey, NL  •  \(811\) 049-0681  •  leal.emiliano.hector@gmail.com) Tj
+ET
+BT
+/F10 10 Tf
+11.5 TL
+0. g
+56.6929133858267775 702.1419685039370506 Td
+(EDUCATION) Tj
+ET
+0. G
+56.6929133858267775 696.4726771653542983 m
+538.5870866141731312 696.4726771653542983 l
+S
+BT
+/F10 11 Tf
+12.6499999999999986 TL
+0. g
+56.6929133858267775 682.2994488188976447 Td
+(Tecmilenio University) Tj
+ET
+BT
+/F10 11 Tf
+12.6499999999999986 TL
+0. g
+448.1670866141731722 682.2994488188976447 Td
+(May 2023 - Present) Tj
+ET
+BT
+/F9 10 Tf
+11.5 TL
+0. g
+56.6929133858267775 668.1262204724409912 Td
+(Software engineer) Tj
+ET
+BT
+/F9 10 Tf
+11.5 TL
+0. g
+478.187086614173154 668.1262204724409912 Td
+(Monterrey, NL) Tj
+ET
+BT
+/F10 10 Tf
+11.5 TL
+0. g
+56.6929133858267775 642.614409448818833 Td
+(PROFESSIONAL SUMMARY) Tj
+ET
+0. G
+56.6929133858267775 636.9451181102361943 m
+538.5870866141731312 636.9451181102361943 l
+S
+BT
+/F9 10 Tf
+11.5 TL
+0. g
+56.6929133858267775 622.7718897637795408 Td
+(Software Engineering student with 3+ years of full-stack development experience. Proven track record of designing and) Tj
+T* (deploying 3+ production-ready web applications with real-world impact, including platforms achieving 100+ active) Tj
+T* (users and 40% monthly growth rates.) Tj
+ET
+BT
+/F10 10 Tf
+11.5 TL
+0. g
+56.6929133858267775 564.6616535433070112 Td
+(SKILLS) Tj
+ET
+0. G
+56.6929133858267775 558.9923622047243725 m
+538.5870866141731312 558.9923622047243725 l
+S
+BT
+/F9 10 Tf
+11.5 TL
+0. g
+56.6929133858267775 544.8191338582676053 Td
+(Frontend: Next.js, React, Javascript, Typescript, Tailwind CSS, SSR / SSG, Responsive design | Backend: Python,) Tj
+T* (\(FastAPI\), Node.js, REST APIs, JWT Auth, PostgreSQL, Supabase | AI/LLM: LLM Integration, RAG Pipelines,) Tj
+T* (Prompt Engineering, Model Inference APIs, Vector Databases, AI Feature Development | DevOps: Docker, CI/CD,) Tj
+T* (AWS, GCP, Azure, Serverless, Microservices, Monitoring & Logging | Architecture: Scalable systems, Performance,) Tj
+T* (Optimization, System design, Caching \(Redis\) | Languages: Spanish Native, English \(C2 Advanced Proficiency\)) Tj
+ET
+BT
+/F10 10 Tf
+11.5 TL
+0. g
+56.6929133858267775 461.1970866141731449 Td
+(WORK EXPERIENCE) Tj
+ET
+0. G
+56.6929133858267775 455.5277952755904494 m
+538.5870866141731312 455.5277952755904494 l
+S
+BT
+/F10 11 Tf
+12.6499999999999986 TL
+0. g
+56.6929133858267775 441.3545669291337958 Td
+(Frontend Developer) Tj
+ET
+BT
+/F10 11 Tf
+12.6499999999999986 TL
+0. g
+448.8270866141731403 441.3545669291337958 Td
+(Mar 2024 - Present) Tj
+ET
+BT
+/F11 10 Tf
+11.5 TL
+0. g
+56.6929133858267775 427.1813385826770855 Td
+(Mydilsa LG Monterrey, NL) Tj
+ET
+BT
+/F9 10 Tf
+11.5 TL
+0. g
+56.6929133858267775 410.1734645669290558 Td
+(• Redesigned and deployed responsive website for industrial manufacturing firm, increasing client engagement by 30%) Tj
+T* (• using Astro framework and Tailwind CSS.) Tj
+T* (• Optimized site performance and user experience for enhanced customer conversion.) Tj
+ET
+BT
+/F10 10 Tf
+11.5 TL
+0. g
+56.6929133858267775 357.7325196850392786 Td
+(PROJECTS) Tj
+ET
+0. G
+56.6929133858267775 352.063228346456583 m
+538.5870866141731312 352.063228346456583 l
+S
+BT
+/F10 11 Tf
+12.6499999999999986 TL
+0. g
+56.6929133858267775 337.8899999999999295 Td
+(ResumeRoast - AI-Powered Resume Review Platform) Tj
+ET
+BT
+/F9 10 Tf
+11.5 TL
+0. g
+56.6929133858267775 320.882125984251843 Td
+(Developed full-stack web application providing AI-driven resume analysis and feedback for job seekers. Implemented) Tj
+T* (user authentication, file upload functionality, and real-time feedback system. Achieved 100+ active users with 40%) Tj
+T* (monthly growth rate through community-driven features and interview preparation tools.) Tj
+ET
+BT
+/F10 11 Tf
+12.6499999999999986 TL
+0. g
+56.6929133858267775 268.4411811023620658 Td
+(SnapLink - URL Optimization Tool) Tj
+ET
+BT
+/F9 10 Tf
+11.5 TL
+0. g
+56.6929133858267775 251.4333070866140361 Td
+(Built performance optimization tool for URL management and link analysis. Implemented caching mechanisms and) Tj
+T* (database optimization techniques resulting in 60% latency reduction. Features include analytics dashboard and bulk) Tj
+T* (URL processing capabilities.) Tj
+ET
+BT
+/F10 11 Tf
+12.6499999999999986 TL
+0. g
+56.6929133858267775 198.9923622047242588 Td
+(Mydilsa LG - Mobile-Compatible Website) Tj
+ET
+BT
+/F9 10 Tf
+11.5 TL
+0. g
+56.6929133858267775 181.9844881889762291 Td
+(Developed responsive mobile-first platform with focus on user engagement and accessibility. Implemented progressive) Tj
+T* (web app features and optimized loading times. Achieved 35% improvement in user engagement through enhanced) Tj
+T* (UI/UX design.) Tj
+ET
+BT
+/F10 11 Tf
+12.6499999999999986 TL
+0. g
+56.6929133858267775 129.5435433070864519 Td
+(Girokiq — Canvas Note-Taking Application) Tj
+ET
+BT
+/F9 10 Tf
+11.5 TL
+0. g
+56.6929133858267775 112.5356692913384222 Td
+(Engineered full-stack canvas-based note-taking app with React and Supabase. Built custom drawing engine supporting) Tj
+T* (pen, eraser, and lasso tools for real-time manipulation. Delivered cloud sync and authentication for secure cross-device) Tj
+T* (access. Optimized rendering to handle 500+ interactive elements with 60fps performance.) Tj
+ET
+endstream
+endobj
+1 0 obj
+<</Type /Pages
+/Kids [3 0 R ]
+/Count 1
+>>
+endobj
+5 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+6 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+7 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-Oblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+8 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-BoldOblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+9 0 obj
+<<
+/Type /Font
+/BaseFont /Courier
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+10 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+11 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-Oblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+12 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-BoldOblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+13 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Roman
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+14 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+15 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Italic
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+16 0 obj
+<<
+/Type /Font
+/BaseFont /Times-BoldItalic
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+17 0 obj
+<<
+/Type /Font
+/BaseFont /ZapfDingbats
+/Subtype /Type1
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+18 0 obj
+<<
+/Type /Font
+/BaseFont /Symbol
+/Subtype /Type1
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+2 0 obj
+<<
+/ProcSet [/PDF /Text /ImageB /ImageC /ImageI]
+/Font <<
+/F1 5 0 R
+/F2 6 0 R
+/F3 7 0 R
+/F4 8 0 R
+/F5 9 0 R
+/F6 10 0 R
+/F7 11 0 R
+/F8 12 0 R
+/F9 13 0 R
+/F10 14 0 R
+/F11 15 0 R
+/F12 16 0 R
+/F13 17 0 R
+/F14 18 0 R
+>>
+/XObject <<
+>>
+>>
+endobj
+19 0 obj
+<<
+/Producer (jsPDF 3.0.4)
+/CreationDate (D:20260314191121-06'00')
+>>
+endobj
+20 0 obj
+<<
+/Type /Catalog
+/Pages 1 0 R
+/OpenAction [3 0 R /FitH null]
+/PageLayout /OneColumn
+>>
+endobj
+xref
+0 21
+0000000000 65535 f 
+0000005556 00000 n 
+0000007373 00000 n 
+0000000015 00000 n 
+0000000152 00000 n 
+0000005613 00000 n 
+0000005738 00000 n 
+0000005868 00000 n 
+0000006001 00000 n 
+0000006138 00000 n 
+0000006261 00000 n 
+0000006390 00000 n 
+0000006522 00000 n 
+0000006658 00000 n 
+0000006786 00000 n 
+0000006913 00000 n 
+0000007042 00000 n 
+0000007175 00000 n 
+0000007277 00000 n 
+0000007621 00000 n 
+0000007707 00000 n 
+trailer
+<<
+/Size 21
+/Root 20 0 R
+/Info 19 0 R
+/ID [ <56275C6A9CAC9E0965E4E9A168F4F7D8> <56275C6A9CAC9E0965E4E9A168F4F7D8> ]
+>>
+startxref
+7811
+%%EOF

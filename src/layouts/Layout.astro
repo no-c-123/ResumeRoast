@@ -6,6 +6,7 @@ import Footer from '../components/Footer.astro';
 import ToastContainer from '../components/uicomponents/ToastContainer.jsx';
 import { AuthProvider } from '../contexts/AuthContext';
 import ErrorBoundary from '../components/ErrorBoundary';
+import CookieConsent from '../components/CookieConsent.jsx';
 ---
 
 <!doctype html>
@@ -29,6 +30,7 @@ import ErrorBoundary from '../components/ErrorBoundary';
                 <div style="view-transition-name: footer;">
                     <Footer />
                 </div>
+                <CookieConsent client:load />
             </AuthProvider>
         </ErrorBoundary>
 	</body>

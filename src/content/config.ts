@@ -23,6 +23,7 @@ const examplesCollection = defineCollection({
         industry: z.string(),
         description: z.string(),
         keySkills: z.array(z.string()),
+        pdf: z.string().optional(),
     }),
 });
 
